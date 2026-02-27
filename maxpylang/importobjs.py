@@ -8,6 +8,8 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 import collections
+import keyword
+import builtins
 
 
 #import some constants...
@@ -52,8 +54,11 @@ def import_objs(*packages, overwrite=False):
     
     #store object info
     save_obj_info(package_paths, package_info_folders)
-    
-    return 
+
+    #generate python stub modules
+    generate_stubs(package_paths, package_info_folders)
+
+    return
 
 
 
@@ -585,3 +590,202 @@ def get_obj_doc_info(refs, names):
         obj_doc_info[name] = doc
 
     return obj_doc_info
+
+
+#************************************************************
+#*************** PYTHON STUB GENERATION *********************
+#************************************************************
+
+
+def sanitize_py_name(max_name):
+    """Convert a Max object name to a valid Python identifier."""
+    name = max_name.replace("~", "_tilde")
+    name = name.replace(".", "_")
+    name = name.replace("-", "_")
+    if name and name[0].isdigit():
+        name = "_" + name
+    if keyword.iskeyword(name) or name in dir(builtins):
+        name = name + "_"
+    return name
+
+
+def _build_docstring(max_name, obj_info):
+    """Build a docstring for a Max object from its JSON info."""
+    doc = obj_info.get("doc", {})
+    args = obj_info.get("args", {})
+    attribs = obj_info.get("attribs", [])
+
+    lines = []
+
+    # line 1: name - digest
+    digest = doc.get("digest", "")
+    if digest:
+        lines.append(f"{max_name} - {digest}")
+    else:
+        lines.append(max_name)
+
+    # description
+    description = doc.get("description", "")
+    if description:
+        lines.append("")
+        lines.append(description)
+
+    # Args section
+    req_args = args.get("required", [])
+    opt_args = args.get("optional", [])
+    if req_args or opt_args:
+        lines.append("")
+        lines.append("Args:")
+        for arg in req_args:
+            arg_type = ", ".join(arg.get("type", [])) if isinstance(arg.get("type"), list) else arg.get("type", "")
+            lines.append(f"  {arg.get('name', '?')} ({arg_type}, required)")
+        for arg in opt_args:
+            arg_type = ", ".join(arg.get("type", [])) if isinstance(arg.get("type"), list) else arg.get("type", "")
+            lines.append(f"  {arg.get('name', '?')} ({arg_type}, optional)")
+
+    # Inlets section
+    inlets = doc.get("inlets", [])
+    if inlets:
+        lines.append("")
+        lines.append("Inlets:")
+        for i, inlet in enumerate(inlets):
+            idx = inlet.get("id", str(i))
+            inlet_type = inlet.get("type", "")
+            digest_text = inlet.get("digest", "")
+            if inlet_type and digest_text:
+                lines.append(f"  {idx} ({inlet_type}): {digest_text}")
+            elif digest_text:
+                lines.append(f"  {idx}: {digest_text}")
+            elif inlet_type:
+                lines.append(f"  {idx} ({inlet_type})")
+
+    # Outlets section
+    outlets = doc.get("outlets", [])
+    if outlets:
+        lines.append("")
+        lines.append("Outlets:")
+        for i, outlet in enumerate(outlets):
+            idx = outlet.get("id", str(i))
+            outlet_type = outlet.get("type", "")
+            digest_text = outlet.get("digest", "")
+            if outlet_type and digest_text:
+                lines.append(f"  {idx} ({outlet_type}): {digest_text}")
+            elif digest_text:
+                lines.append(f"  {idx}: {digest_text}")
+            elif outlet_type:
+                lines.append(f"  {idx} ({outlet_type})")
+
+    # Messages section (one-liner, just names)
+    methods = doc.get("methods", [])
+    if methods:
+        method_names = [m.get("name", "") for m in methods if m.get("name")]
+        if method_names:
+            lines.append("")
+            lines.append("Messages: " + ", ".join(method_names))
+
+    # Attributes section (one-liner, just names, skip COMMON)
+    if attribs:
+        attrib_names = [a.get("name", "") for a in attribs
+                        if a.get("name") and a.get("name") != "COMMON"]
+        if attrib_names:
+            lines.append("")
+            lines.append("Attributes: " + ", ".join(attrib_names))
+
+    # See also
+    seealso = doc.get("seealso", [])
+    if seealso:
+        lines.append("")
+        lines.append("See also: " + ", ".join(seealso))
+
+    return "\n".join(lines)
+
+
+def generate_stubs(package_paths, package_info_folders):
+    """
+    Generate Python stub modules for imported Max objects.
+
+    Creates maxpylang/objects/{package}.py with pre-instantiated MaxObject
+    variables so users get IDE autocomplete.
+    """
+
+    # path to maxpylang/objects/
+    objects_dir = os.path.join(
+        os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir)),
+        "objects"
+    )
+    os.makedirs(objects_dir, exist_ok=True)
+
+    for package, info_folder in package_info_folders.items():
+
+        # read all JSON files for this package
+        json_files = sorted(glob.glob(os.path.join(info_folder, "*.json")))
+        if not json_files:
+            continue
+
+        names_map = {}   # py_name -> max_name
+        obj_infos = {}   # max_name -> parsed json
+
+        for jf in json_files:
+            max_name = Path(jf).stem
+            with open(jf, "r") as f:
+                obj_info = json.load(f)
+            py_name = sanitize_py_name(max_name)
+            names_map[py_name] = max_name
+            obj_infos[max_name] = obj_info
+
+        # build the stub module
+        stub_lines = []
+        stub_lines.append(f'"""MaxObject stubs for {package} objects. Auto-generated by import_objs()."""')
+        stub_lines.append("from maxpylang.maxobject import MaxObject")
+        stub_lines.append("")
+
+        # __all__
+        all_names = sorted(names_map.keys())
+        stub_lines.append("__all__ = [")
+        for py_name in all_names:
+            stub_lines.append(f"    '{py_name}',")
+        stub_lines.append("]")
+        stub_lines.append("")
+
+        # _NAMES dict
+        stub_lines.append("_NAMES = {")
+        for py_name in all_names:
+            stub_lines.append(f"    '{py_name}': '{names_map[py_name]}',")
+        stub_lines.append("}")
+        stub_lines.append("")
+
+        # per-object docstrings + variable declarations
+        for py_name in all_names:
+            max_name = names_map[py_name]
+            obj_info = obj_infos[max_name]
+            docstring = _build_docstring(max_name, obj_info)
+            docstring = docstring.replace('"""', '\\"""')
+
+            # write triple-quoted docstring
+            stub_lines.append('"""')
+            stub_lines.append(docstring)
+            stub_lines.append('"""')
+            stub_lines.append(f"{py_name} = MaxObject('{max_name}')")
+            stub_lines.append("")
+
+        # write the stub file
+        stub_path = os.path.join(objects_dir, f"{package}.py")
+        with open(stub_path, "w") as f:
+            f.write("\n".join(stub_lines))
+
+        print(f"\tstub module generated: objects/{package}.py ({len(names_map)} objects)")
+
+    # regenerate __init__.py based on existing stub files
+    init_path = os.path.join(objects_dir, "__init__.py")
+    existing_stubs = [Path(p).stem for p in sorted(glob.glob(os.path.join(objects_dir, "*.py")))
+                      if Path(p).stem != "__init__"]
+    init_lines = ['"""Pre-instantiated MaxObject stubs for all imported packages."""']
+    for stem in existing_stubs:
+        init_lines.append("try:")
+        init_lines.append(f"    from .{stem} import *")
+        init_lines.append("except ImportError:")
+        init_lines.append("    pass")
+    with open(init_path, "w") as f:
+        f.write("\n".join(init_lines) + "\n")
+
+    print("stub generation complete\n")
