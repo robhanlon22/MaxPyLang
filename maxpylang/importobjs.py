@@ -186,15 +186,21 @@ def save_obj_info(package_paths, package_info_folders):
         #get inlet/outlet info (from io files)
         print("\tgetting inlet/outlet info...")
         objinout_info = get_objinout_info(package, obj_names)
-        print("\tinlet/outlet info retrieved\n") 
-        
-        #save maxpy obj info files 
+        print("\tinlet/outlet info retrieved\n")
+
+        #get doc info (digest, description, inlets, outlets, methods, seealso)
+        print("\tgetting doc info...")
+        obj_doc_info = get_obj_doc_info(obj_refs, obj_names)
+        print("\tdoc info retrieved\n")
+
+        #save maxpy obj info files
         print("\tsaving object info files...")
         for name in obj_names:
-            obj_info = {'default': default_obj_info[name], 
-                        'args': objarg_info[name], 
+            obj_info = {'default': default_obj_info[name],
+                        'args': objarg_info[name],
                         'attribs': objattrib_info[name],
-                        'in/out': objinout_info[name]}
+                        'in/out': objinout_info[name],
+                        'doc': obj_doc_info[name]}
             
             obj_file = os.path.join(info_folder, name + '.json')
             with open(obj_file, 'w') as f:
