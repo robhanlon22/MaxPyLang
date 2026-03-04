@@ -115,6 +115,21 @@ Loading existing patches::
         print(obj.name)
     patch.save("modified")
 
+Abstractions
+------------
+
+For custom Max abstractions (sub-patches), use ``abstraction=True`` to declare
+objects without needing the ``.maxpat`` file in the current directory::
+
+    # Declare abstraction with known I/O (file doesn't need to exist)
+    synth = mp.MaxObject("my_synth", abstraction=True, inlets=2, outlets=2)
+
+    # Then place it in a patch
+    patch.place(synth)
+
+    # If the file exists in cwd, auto-detection still works as before
+    synth = mp.MaxObject("my_synth")
+
 Key Rules
 ---------
 
