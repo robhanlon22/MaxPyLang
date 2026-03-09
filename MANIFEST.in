@@ -1,5 +1,12 @@
-include *.txt
-recursive-include docs *.txt
-recursive-include maxpylang/tools *
-recursive-include maxpylang/data *
+include CHANGES.txt
+include LICENSE.txt
 include README.md
+recursive-include maxpylang/data *.json
+prune build
+prune dist
+prune docs
+prune tests
+prune maxpylang/test
+prune maxpylang.egg-info
+global-exclude __pycache__/*
+global-exclude *.py[cod]

@@ -1,4 +1,7 @@
 """Pre-instantiated MaxObject stubs for all imported packages."""
+
+# ruff: noqa: F403
+
 import warnings
 from maxpylang.exceptions import UnknownObjectWarning
 

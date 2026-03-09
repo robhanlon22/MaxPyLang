@@ -24,7 +24,7 @@ Core API
     patch.save(filename="default.maxpat", verbose=True, check=True)
     patch.set_position(new_x, new_y)
 
-- ``place()`` **always returns a list** — use ``[0]`` for a single object.
+- ``place()`` **always returns a list** - use ``[0]`` for a single object.
 - Each connection is ``[outlet, inlet]``: ``patch.connect([obj1.outs[0], obj2.ins[0]])``.
 - ``save()`` auto-appends ``.maxpat`` if missing.
 
@@ -48,11 +48,11 @@ Pre-instantiated MaxObject stubs for IDE autocomplete::
 
 Naming rules:
 
-- ``~`` becomes ``_tilde`` (``cycle~`` → ``cycle_tilde``)
-- ``.`` becomes ``_`` (``jit.movie`` → ``jit_movie``)
-- ``-`` becomes ``_`` (``live.dial`` → ``live_dial``)
-- Leading digit gets ``_`` prefix (``2d.wave~`` → ``_2d_wave_tilde``)
-- Python keywords get ``_`` suffix (``in`` → ``in_``)
+- ``~`` becomes ``_tilde`` (``cycle~`` -> ``cycle_tilde``)
+- ``.`` becomes ``_`` (``jit.movie`` -> ``jit_movie``)
+- ``-`` becomes ``_`` (``live.dial`` -> ``live_dial``)
+- Leading digit gets ``_`` prefix (``2d.wave~`` -> ``_2d_wave_tilde``)
+- Python keywords get ``_`` suffix (``in`` -> ``in_``)
 
 Stubs have no arguments. Use string syntax when arguments are needed::
 
@@ -69,7 +69,7 @@ Common objects by category:
 - **Audio sources**: cycle~, noise~, pink~, rect~, saw~, tri~, phasor~
 - **Audio I/O**: adc~, dac~, ezdac~, ezadc~
 - **Audio processing**: gain~, lores~, reson~, biquad~, delay~, tapin~, tapout~
-- **Math (audio)**: +~, *~, -~, /~, clip~, abs~, scale~
+- **Math (audio)**: +~, *~, -, /~, clip~, abs~, scale~
 - **Control**: metro, counter, toggle, button, number, flonum, dial
 - **Routing**: gate, switch, route, select, trigger, pack, unpack
 - **Data**: coll, dict, table, buffer~, preset
@@ -133,11 +133,11 @@ objects without needing the ``.maxpat`` file in the current directory::
 Key Rules
 ---------
 
-- ``place()`` **always returns a list** — use ``[0]`` for single objects.
+- ``place()`` **always returns a list** - use ``[0]`` for single objects.
 - Object names are **case-sensitive** and must match Max names exactly.
 - Coordinates are floats. Inlet/outlet indices are **0-based**.
 - ``save()`` auto-appends ``.maxpat``. ``verbose=False`` suppresses console output.
-- **Typos raise UnknownObjectWarning** — if you see this warning, fix the object name
+- **Typos raise UnknownObjectWarning** - if you see this warning, fix the object name
   immediately. The object will have 0 inlets/outlets and won't work.
   Use ``obj.notknown()`` to check programmatically.
 
@@ -180,13 +180,23 @@ Vanilla stubs (max, msp, jit) ship with the package.
 Use ``import_objs()`` to add third-party packages or refresh stubs.
 """
 
-from .tools import constants
-from .maxobject import MaxObject
-from .maxpatch import MaxPatch
-from .importobjs import import_objs
-from .xlet import Inlet, Outlet
+from __future__ import annotations
 
-try:
-    from . import objects
-except ImportError:
-    pass  # objects not yet generated
+from importlib import import_module
+from typing import Any
+
+from .importobjs import import_objs as import_objs
+from .maxobject import MaxObject as MaxObject
+from .maxpatch import MaxPatch as MaxPatch
+from .tools import constants as constants
+from .xlet import Inlet as Inlet, Outlet as Outlet
+
+__all__ = ["constants", "Inlet", "MaxObject", "MaxPatch", "Outlet", "import_objs"]
+
+
+def __getattr__(name: str) -> Any:
+    if name == "objects":
+        objects_module = import_module(".objects", __name__)
+        globals()["objects"] = objects_module
+        return objects_module
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

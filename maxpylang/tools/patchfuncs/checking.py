@@ -10,27 +10,29 @@ Methods related to checking MaxPatches (currently for unknown/abstraction/js lin
     get_js_objs() --> get js objects, linked and unlinked
 
 """
-import os
 
-def check(self, *flags):
+import os
+from typing import Any
+
+
+def check(self: Any, *flags: str) -> None:
     """
     This method checks the patch for linked abstractions, unknown objects, and linked/unlinked js objects.
 
-    :param \*flags: takes keywords ``'abstractions'``, ``'unknowns'``, ``'js'``. If no flags given, checks all three categories.
-    :type \*flags: str, optional
+    :param *flags: takes keywords ``'abstractions'``, ``'unknowns'``, ``'js'``. If no flags given, checks all three categories.
+    :type *flags: str, optional
 
     :returns: outputs a list of all the objects that fall under the specified categories, \
     identified by object id, name, text, and linked file (if applicable).
     :rtype: printed output
     """
 
-    flags = list(flags)
+    flag_list = list(flags)
 
-    if len(flags) == 0 or 'all' in flags:
-        flags += ['unknown', 'js', 'abstractions']
+    if len(flag_list) == 0 or "all" in flag_list:
+        flag_list += ["unknown", "js", "abstractions"]
 
-    if 'unknown' in flags or 'unknowns' in flags:
-
+    if "unknown" in flag_list or "unknowns" in flag_list:
         unknown_objs = self.get_unknowns()
 
         if unknown_objs:
@@ -42,8 +44,7 @@ def check(self, *flags):
             print("PatchCheck: unknown objects : no unknown objects")
         print()
 
-    if 'js' in flags:
-
+    if "js" in flag_list:
         js_linked, js_unlinked = self.get_js_objs()
 
         if js_unlinked:
@@ -51,55 +52,75 @@ def check(self, *flags):
             for label, obj in js_unlinked.items():
                 print("              ", label, ":", obj)
 
-
         else:
             print("PatchCheck: unlinked js objects : no unlinked js objects")
         print()
 
         if js_linked:
-            print("PatchCheck: linked js objects (files must be in same folder as patch file):")
+            print(
+                "PatchCheck: linked js objects (files must be in same folder as patch file):"
+            )
             for label, obj in js_linked.items():
-                print("              ", label, ":", obj, "-->", os.path.basename(obj._ext_file))
+                print(
+                    "              ",
+                    label,
+                    ":",
+                    obj,
+                    "-->",
+                    os.path.basename(obj._ext_file),
+                )
 
         else:
-            print("PatchCheck: linked js objects (files must be in same folder as patch file): no linked js objects")
+            print(
+                "PatchCheck: linked js objects (files must be in same folder as patch file): no linked js objects"
+            )
         print()
 
-    if 'abstractions' in flags or 'abstraction' in flags:
+    if "abstractions" in flag_list or "abstraction" in flag_list:
         abstractions = self.get_abstractions()
         if abstractions:
-            print("PatchCheck: linked abstractions (files must be in same folder as patch file):")
+            print(
+                "PatchCheck: linked abstractions (files must be in same folder as patch file):"
+            )
             for label, obj in abstractions.items():
-                print("              ", label, ":", obj, "-->", os.path.basename(obj._ext_file))
+                print(
+                    "              ",
+                    label,
+                    ":",
+                    obj,
+                    "-->",
+                    os.path.basename(obj._ext_file),
+                )
 
         else:
-            print("PatchCheck: linked abstractions (files must be in same folder as patch file): no linked abstractions")
+            print(
+                "PatchCheck: linked abstractions (files must be in same folder as patch file): no linked abstractions"
+            )
         print()
 
     return
 
 
-
-def get_unknowns(self):
+def get_unknowns(self: Any) -> dict[str, Any]:
     """
     Get a list of unknown objects in the patch.
     """
 
-    unknowns = {}
+    unknowns: dict[str, Any] = {}
 
     for label, obj in self._objs.items():
-        if obj._ref_file == None:
+        if obj._ref_file is None:
             unknowns[label] = obj
 
     return unknowns
 
 
-def get_abstractions(self):
+def get_abstractions(self: Any) -> dict[str, Any]:
     """
     Get a list of abstractions in the patch.
     """
 
-    abstractions = {}
+    abstractions: dict[str, Any] = {}
 
     for label, obj in self._objs.items():
         if obj._ref_file == "abstraction":
@@ -107,16 +128,17 @@ def get_abstractions(self):
 
     return abstractions
 
-def get_js_objs(self):
+
+def get_js_objs(self: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Get a list of js files in the patch.
     """
 
-    linked = {}
-    unlinked = {}
+    linked: dict[str, Any] = {}
+    unlinked: dict[str, Any] = {}
 
     for label, obj in self._objs.items():
-        if obj.name == 'js':
+        if obj.name == "js":
             if obj._ext_file is None:
                 unlinked[label] = obj
             else:

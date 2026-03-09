@@ -8,33 +8,36 @@ Miscellaneous functions for the MaxObject class.
 
 """
 
+from __future__ import annotations
 
-from maxpylang.xlet import Inlet, Outlet
+from typing import TYPE_CHECKING
 
-def notknown(self):
+if TYPE_CHECKING:
+    from maxpylang.maxobject import MaxObject
+
+
+def notknown(self: "MaxObject") -> bool:
     """
     Return true if the object has no ref_file.
     """
 
-    if self._ref_file == None:
-        return True
-
-    return False
+    return self._ref_file is None
 
 
-#def isempty(self):
-    #"""
-    #Returns true if the object is empty; wrapper for notknown(), for clarity.
-    #"""
-    #return self.notknown()
+# def isempty(self):
+# """
+# Returns true if the object is empty; wrapper for notknown(), for clarity.
+# """
+# return self.notknown()
 
-def __repr__(self):
+
+def __repr__(self: "MaxObject") -> str:
 
     rep = self.name + " ["
-    if 'text' in self._dict['box'].keys():
-        rep += self._dict['box']['text']
+    if "text" in self._dict["box"].keys():
+        rep += str(self._dict["box"]["text"])
     else:
-        rep += self._dict['box']['maxclass']
+        rep += str(self._dict["box"]["maxclass"])
 
     rep += "]"
 

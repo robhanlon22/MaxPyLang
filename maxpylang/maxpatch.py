@@ -1,24 +1,40 @@
 """
 Class representing a MaxPatch.
 """
+
 from __future__ import annotations
+
+from typing import Any, cast
 
 import os
 
 from .maxobject import MaxObject
-from .xlet import Inlet, Outlet
+from .tools import constants as _constants
+from .tools.patchfuncs import checking as _checking
+from .tools.patchfuncs import deleting as _deleting
+from .tools.patchfuncs import exposed as _exposed
+from .tools.patchfuncs import instantiation as _instantiation
+from .tools.patchfuncs import misc as _misc
+from .tools.patchfuncs import patchcords as _patchcords
+from .tools.patchfuncs import placing as _placing
+from .tools.patchfuncs import saving as _saving
+
+JSONDict = dict[str, Any]
+ObjectDict = dict[str, MaxObject]
+ConnectionSpec = list[Any]
+ConnectionCollection = list[ConnectionSpec]
 
 
 class MaxPatch:
     """
-    This class represents a MaxMSP patch. A MaxPatch can be created as a copy of a template file, \
+    This class represents a MaxMSP patch. A MaxPatch can be created as a copy of a template file,
     or by loading in an existing *.maxpat* file.
 
-    :param template: the path to a template *.maxpat* file. Can be given as an absolute path, a relative path \
+    :param template: the path to a template *.maxpat* file. Can be given as an absolute path, a relative path
                      from the current directory, or a relative path from ``MaxPy/maxpy/data/PATCH_TEMPLATES/``.
     :type template: str, optional; default: None
 
-    :param load_file: the path to an existing *.maxpat* file to be loaded in. \
+    :param load_file: the path to an existing *.maxpat* file to be loaded in.
                       Can be given as an absolute path or a relative path from the current directory.
     :type load_file: str, optional; default: None
 
@@ -29,27 +45,27 @@ class MaxPatch:
     :type verbose: bool, optional; default: True
     """
 
-    from .tools.constants import (
-        patch_templates_path,
-    )  #: Path to the patch templates folder MaxPy/maxpy/data/PATCH_TEMPLATES.
+    patch_templates_path = _constants.patch_templates_path
 
-    def __init__(self, template=None, load_file=None, reorder=True, verbose=True):
+    def __init__(
+        self,
+        template: str | None = None,
+        load_file: str | None = None,
+        reorder: bool = True,
+        verbose: bool = True,
+    ) -> None:
         """
         Constructor method.
         """
 
-        # instance variables:
-        self._objs = {}  #: objects in patch, referenced as "obj-num": object
-        self._num_objs = 0  #: number of objects in the patch
-        self._patcher_dict = {}  #: the patch's JSON data
-        self._curr_position = [0.0, 0.0]  #: 'cursor' position at which to place objects
-        self._filename = "default.maxpat"  #: the file where the patch is saved
+        self._objs: ObjectDict = {}
+        self._num_objs = 0
+        self._patcher_dict: JSONDict = {}
+        self._curr_position: list[float] = [0.0, 0.0]
+        self._filename = "default.maxpat"
 
-        # load existing maxpatch
         if load_file:
             self.load_file(load_file, reorder=reorder, verbose=verbose)
-
-        # or, make copy from template
         else:
             if template is None:
                 template = os.path.join(
@@ -57,17 +73,12 @@ class MaxPatch:
                 )
             self.load_template(template, verbose=verbose)
 
-        return
-
-    # some properties to get info...
     @property
-    def objs(self) -> dict:
+    def objs(self) -> ObjectDict:
         """
         A dictionary of all Max objects in the patch, stored by object id. Read-only.
         """
-        return (
-            self._objs
-        )  # this one is tricky bc you can still technically set the dictionary values....w/e
+        return self._objs
 
     @property
     def num_objs(self) -> int:
@@ -77,7 +88,7 @@ class MaxPatch:
         return self._num_objs
 
     @property
-    def curr_position(self) -> list[int, float]:
+    def curr_position(self) -> list[float]:
         """
         The current position of the 'cursor' at which to place Max objects. Given as a two-element list [x, y] of patch coordinates.
         Can be set using :func:`MaxPatch.set_position`.
@@ -85,66 +96,216 @@ class MaxPatch:
         return self._curr_position
 
     @property
-    def dict(self) -> dict:
+    def dict(self) -> JSONDict:
         """
         The JSON dict of the patch. Read-only.
         """
         return self.get_json()
 
-    # FOR INSTANTIATION
-    from .tools.patchfuncs.instantiation import load_template
-    from .tools.patchfuncs.instantiation import (
-        load_file,
-        load_objs_from_dict,
-        load_patchcords_from_dict,
-        clean_patcher_dict,
-    )
+    def load_template(self, t: str, verbose: bool = True) -> None:
+        _instantiation.load_template(self, t, verbose=verbose)
 
-    # functions for user usage
-    from .tools.patchfuncs.exposed import (
-        reorder,
-        set_position,
-        inspect,
-        save,
-        place,
-        connect,
-        replace,
-        delete,
-        check,
-    )
+    def load_file(self, f: str, reorder: bool = True, verbose: bool = True) -> None:
+        _instantiation.load_file(self, f, reorder=reorder, verbose=verbose)
 
-    # FOR SAVING
-    from .tools.patchfuncs.saving import get_json
+    def load_objs_from_dict(self, patch_dict: JSONDict, verbose: bool = True) -> None:
+        _instantiation.load_objs_from_dict(self, patch_dict, verbose=verbose)
 
-    # FOR PLACING
-    from .tools.patchfuncs.placing import (
-        place_check_args,
-        place_pick_objs,
-        place_grid,
-        place_random,
-        place_custom,
-        place_vertical,
-        place_obj,
-        get_obj_from_spec,
-    )
+    def load_patchcords_from_dict(
+        self, patch_dict: JSONDict, verbose: bool = True
+    ) -> None:
+        _instantiation.load_patchcords_from_dict(self, patch_dict, verbose=verbose)
 
-    # FOR PATCHCORDS
-    from .tools.patchfuncs.patchcords import (
-        swap_patchcords,
-        check_connection_format,
-        check_connection_typing,
-        check_connection_exists,
-    )
+    def clean_patcher_dict(self, patch_dict: JSONDict) -> JSONDict:
+        return _instantiation.clean_patcher_dict(self, patch_dict)
 
-    # FOR DELETING
-    from .tools.patchfuncs.deleting import (
-        delete_get_extra_cords,
-        delete_cords,
-        delete_objs,
-    )
+    def reorder(self, verbose: bool = False) -> None:
+        _exposed.reorder(self, verbose=verbose)
 
-    # FOR CHECKING
-    from .tools.patchfuncs.checking import get_unknowns, get_abstractions, get_js_objs
+    def set_position(
+        self,
+        new_x: float,
+        new_y: float,
+        from_place: bool = False,
+        verbose: bool = False,
+    ) -> None:
+        _exposed.set_position(
+            self, new_x, new_y, from_place=from_place, verbose=verbose
+        )
 
-    # MISC FUNCTIONS
-    from .tools.patchfuncs.misc import add_barebones_obj
+    def replace(
+        self,
+        curr_obj_num: str,
+        new_obj: Any,
+        retain: bool = True,
+        verbose: bool = False,
+        **new_attribs: Any,
+    ) -> None:
+        _exposed.replace(
+            self,
+            curr_obj_num,
+            new_obj,
+            retain=retain,
+            verbose=verbose,
+            **new_attribs,
+        )
+
+    def inspect(self, *objs: str, info: str = "all") -> None:
+        _exposed.inspect(self, *objs, info=info)
+
+    def save(
+        self, filename: str = "default.maxpat", verbose: bool = True, check: bool = True
+    ) -> None:
+        _saving.save(self, filename=filename, verbose=verbose, check=check)
+
+    def get_json(self) -> JSONDict:
+        return _saving.get_json(self)
+
+    def place(
+        self,
+        *objs: _placing.ObjectSpec,
+        randpick: bool = False,
+        num_objs: _placing.CountSpec = 1,
+        seed: int | None = None,
+        weights: list[float] | None = None,
+        spacing_type: str = "grid",
+        spacing: Any = None,
+        starting_pos: _placing.Position | None = None,
+        verbose: bool = False,
+    ) -> list[MaxObject]:
+        if spacing is None:
+            spacing = [80.0, 80.0]
+        return _placing.place(
+            self,
+            *objs,
+            randpick=randpick,
+            num_objs=num_objs,
+            seed=seed,
+            weights=weights,
+            spacing_type=spacing_type,
+            spacing=spacing,
+            starting_pos=starting_pos,
+            verbose=verbose,
+        )
+
+    def place_check_args(
+        self,
+        objs: Any,
+        randpick: bool,
+        num_objs: _placing.CountSpec,
+        seed: int | None,
+        weights: Any,
+        spacing_type: str,
+        spacing: Any,
+        starting_pos: Any,
+    ) -> tuple[_placing.CountSpec, Any]:
+        return _placing.place_check_args(
+            self,
+            objs,
+            randpick,
+            num_objs,
+            seed,
+            weights,
+            spacing_type,
+            spacing,
+            starting_pos,
+        )
+
+    def place_pick_objs(
+        self,
+        objs: Any,
+        randpick: bool,
+        num_objs: _placing.CountSpec,
+        seed: int | None,
+        weights: Any,
+        verbose: bool,
+    ) -> list[_placing.ObjectSpec]:
+        return _placing.place_pick_objs(
+            self, objs, randpick, num_objs, seed, weights, verbose
+        )
+
+    def place_grid(
+        self, objs: Any, spacing: Any, verbose: bool = False
+    ) -> list[MaxObject]:
+        return _placing.place_grid(self, objs, spacing, verbose=verbose)
+
+    def place_random(
+        self, objs: Any, seed: int, verbose: bool = False
+    ) -> list[MaxObject]:
+        return _placing.place_random(self, objs, seed, verbose=verbose)
+
+    def place_custom(
+        self,
+        objs: Any,
+        positions: Any,
+        verbose: bool = False,
+    ) -> list[MaxObject]:
+        return _placing.place_custom(self, objs, positions, verbose=verbose)
+
+    def place_vertical(
+        self, objs: Any, spacing: float, verbose: bool = False
+    ) -> list[MaxObject]:
+        return _placing.place_vertical(self, objs, spacing, verbose=verbose)
+
+    def place_obj(
+        self,
+        obj: _placing.ObjectSpec,
+        position: _placing.Position | None = None,
+        verbose: bool = False,
+        replace_id: str | None = None,
+    ) -> MaxObject:
+        if position is None:
+            position = [0.0, 0.0]
+        return _placing.place_obj(
+            self, obj, position=position, verbose=verbose, replace_id=replace_id
+        )
+
+    def get_obj_from_spec(self, obj_spec: _placing.ObjectSpec) -> MaxObject:
+        return _placing.get_obj_from_spec(self, obj_spec)
+
+    def connect(self, *connections: ConnectionSpec, verbose: bool = True) -> None:
+        _patchcords.connect(self, *connections, verbose=verbose)
+
+    def swap_patchcords(self, new: MaxObject, old: MaxObject) -> None:
+        _patchcords.swap_patchcords(self, new, old)
+
+    def check_connection_format(self, connections: Any) -> None:
+        _patchcords.check_connection_format(self, connections)
+
+    def check_connection_typing(self, connections: Any) -> Any:
+        return _patchcords.check_connection_typing(self, connections)
+
+    def check_connection_exists(self, connections: Any) -> list[ConnectionSpec]:
+        return _patchcords.check_connection_exists(self, connections)
+
+    def delete(
+        self,
+        objs: Any = None,
+        cords: Any = None,
+        verbose: bool = True,
+    ) -> None:
+        _deleting.delete(self, objs=objs, cords=cords, verbose=verbose)
+
+    def delete_get_extra_cords(self, *objs: str) -> list[ConnectionSpec]:
+        return _deleting.delete_get_extra_cords(self, *objs)
+
+    def delete_cords(self, *cords: ConnectionSpec, verbose: bool = True) -> None:
+        _deleting.delete_cords(self, *cords, verbose=verbose)
+
+    def delete_objs(self, *objs: str, verbose: bool = True) -> None:
+        _deleting.delete_objs(self, *objs, verbose=verbose)
+
+    def check(self, *flags: str) -> None:
+        _checking.check(self, *flags)
+
+    def get_unknowns(self) -> ObjectDict:
+        return cast(ObjectDict, _checking.get_unknowns(self))
+
+    def get_abstractions(self) -> ObjectDict:
+        return cast(ObjectDict, _checking.get_abstractions(self))
+
+    def get_js_objs(self) -> tuple[ObjectDict, ObjectDict]:
+        return cast(tuple[ObjectDict, ObjectDict], _checking.get_js_objs(self))
+
+    def add_barebones_obj(self, obj_text: str) -> None:
+        _misc.add_barebones_obj(self, obj_text)

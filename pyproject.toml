@@ -9,27 +9,69 @@ description = "Python API for making MaxMSP patches."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-license = "MIT" 
+license = "MIT"
+license-files = ["LICENSE.txt"]
 authors = [
     {name = "Ranger Liu", email = "ranger.liu@columbia.edu"},
     {name = "Mark Santolucito", email = "msantolu@barnard.edu"},
 ]
 dependencies = [
     "numpy>=1.22.0",
-    "sphinx_rtd_theme",
     "tabulate",
 ]
 
 [project.urls]
-Homepage = "http://pypi.python.org/pypi/MaxPyLang/"
+Homepage = "https://github.com/Barnard-PL-Labs/MaxPyLang"
+Documentation = "https://barnard-pl-labs.github.io/MaxPyLang/"
+Repository = "https://github.com/Barnard-PL-Labs/MaxPyLang"
+Issues = "https://github.com/Barnard-PL-Labs/MaxPyLang/issues"
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=maxpylang --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["maxpylang"]
+relative_files = true
+omit = ["maxpylang/objects/*.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
 
 [tool.setuptools]
-include-package-data = true
+include-package-data = false
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["maxpylang*"]
+exclude = ["maxpylang.test*"]
+namespaces = false
 
+[tool.setuptools.package-data]
+maxpylang = ["data/*.json", "data/*/*.json", "data/*/*/*.json"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.py[cod]"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "pre-commit>=4.3.0",
+    "pytest>=8.4.2",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.15.5",
+    "sphinx-rtd-theme>=3.1.0",
+]

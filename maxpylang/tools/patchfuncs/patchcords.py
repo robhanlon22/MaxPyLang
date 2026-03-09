@@ -14,16 +14,23 @@ Methods related to patchcords in a MaxPatch.
 
 
 """
+
 from __future__ import annotations
+
+from typing import Any
 
 from maxpylang.xlet import Inlet, Outlet
 
+
+Connection = list[Any]
+
+
 # user usage
-def connect(self, *connections, verbose=True):
+def connect(self: Any, *connections: Connection, verbose: bool = True) -> None:
     """
     This method creates patchcords to connect objects. *currently fixing connection specification...*
 
-    :param \*connections: a list of connections to make. Each connection must be specified as a tuple \
+    :param *connections: a list of connections to make. Each connection must be specified as a tuple \
     (:class:`~maxpy.Outlet`, :class:`~maxpy.Inlet` (, ``list``)). The optional third element specifies midpoints \
     (curves) of the patchcord as a list of [x, y] coordinates.
 
@@ -65,15 +72,15 @@ def connect(self, *connections, verbose=True):
     return
 
 
-def swap_patchcords(self, new, old):
+def swap_patchcords(self: Any, new: Any, old: Any) -> None:
     """
     Helper function for replace.
 
     Swaps all possible patchcords from the old object to new object.
     """
 
-    new_connections = []
-    old_connections = []
+    new_connections: list[Connection] = []
+    old_connections: list[Connection] = []
 
     # get patchcords coming into remaining inlets
     for old_in, new_in in zip(old.ins[: len(new.ins)], new.ins):
@@ -105,7 +112,9 @@ def swap_patchcords(self, new, old):
     return
 
 
-def check_connection_format(self, connections):
+def check_connection_format(
+    self: Any, connections: tuple[Connection, ...] | list[Connection]
+) -> None:
     """
     Helper function for patchcords.
 
@@ -116,17 +125,19 @@ def check_connection_format(self, connections):
         assert (
             isinstance(connection[0], Outlet)
             and isinstance(connection[1], Inlet)
-            and f"connections must be specified as (Outlet, Inlet, [optional: midpoints])"
+            and "connections must be specified as (Outlet, Inlet, [optional: midpoints])"
         )
         if len(connection) == 3:
-            assert isinstance(
-                connection[2], list
-            ), f"optional midpoints must be specified as list"
+            assert isinstance(connection[2], list), (
+                "optional midpoints must be specified as list"
+            )
 
     return
 
 
-def check_connection_typing(self, connections):
+def check_connection_typing(
+    self: Any, connections: tuple[Connection, ...] | list[Connection]
+) -> list[Connection]:
     """
     Helper function for patchcords.
 
@@ -134,17 +145,19 @@ def check_connection_typing(self, connections):
     """
     ###PLACEHOLDER!
 
-    return connections
+    return list(connections)
 
 
-def check_connection_exists(self, connections):
+def check_connection_exists(
+    self: Any, connections: tuple[Connection, ...] | list[Connection]
+) -> list[Connection]:
     """
     Helper function for patchcords.
 
     Removes nonexistent connections from list and returns updated list.
     """
 
-    existing_connections = []
+    existing_connections: list[Connection] = []
 
     for connection in connections:
         outlet = connection[0]

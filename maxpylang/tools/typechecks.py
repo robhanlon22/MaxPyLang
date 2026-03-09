@@ -2,54 +2,60 @@
 Methods for checking datatypes.
 """
 
-def check_number(arg):
+from typing import Any, Callable, Sequence
+
+
+def check_number(arg: Any) -> bool:
     """
     Check for number (float or int).
     """
     try:
         float(arg)
         return True
-    except ValueError:
-        return False 
+    except (TypeError, ValueError):
+        return False
 
 
-def check_any(arg):
+def check_any(arg: Any) -> bool:
     """
     Check if it's "anything"....
     """
+    del arg
     return True
 
 
-def check_int(arg):
+def check_int(arg: Any) -> bool:
     """
-    Check int. 
+    Check int.
     """
     try:
         int(arg)
         return True
-    except ValueError:
+    except (TypeError, ValueError):
         return False
-    
-#functions associated with types, for typechecking
-typecheck_funcs = {'int': check_number,        #attrib
-                   'symbol': check_any,        #attrib
-                   'number': check_number, 
-                   'list': check_any,
-                   'any': check_any, 
-                   'float': check_number,      #attrib
-                   'atom_long': check_number,  #attrib
-                   'atom': check_any,          #attrib
-                   'int32': check_number,      #attrib
-                   'object': check_any,        #attrib
-                   'atomarray': check_any      #attrib
-                  }
 
-    
-def check_type(types: list, arg: str):
+
+# functions associated with types, for typechecking
+typecheck_funcs: dict[str, Callable[[Any], bool]] = {
+    "int": check_number,  # attrib
+    "symbol": check_any,  # attrib
+    "number": check_number,
+    "list": check_any,
+    "any": check_any,
+    "float": check_number,  # attrib
+    "atom_long": check_number,  # attrib
+    "atom": check_any,  # attrib
+    "int32": check_number,  # attrib
+    "object": check_any,  # attrib
+    "atomarray": check_any,  # attrib
+}
+
+
+def check_type(types: Sequence[str], arg: Any) -> bool:
     """
     Checks a single argument against a list of types.
 
     Returns True if the argument matches any of the types.
-    Returns False if the argument matches none of the types. 
+    Returns False if the argument matches none of the types.
     """
-    return any([typecheck_funcs[t](arg) for t in types])
+    return any(typecheck_funcs[t](arg) for t in types)

@@ -8,71 +8,103 @@ Methods dealing with text args for MaxObjects.
 
 """
 
+from __future__ import annotations
 import warnings
+
+from typing import TYPE_CHECKING, Any, Sequence, Union
 
 from maxpylang.tools import typechecks as tc
 from maxpylang.exceptions import UnknownObjectWarning
-import tabulate
+import tabulate  # type: ignore[import-untyped]
 
-def args_valid(self, name, args, arg_info):
+if TYPE_CHECKING:
+    from maxpylang.maxobject import MaxObject
+
+
+def args_valid(
+    self: "MaxObject",
+    name: str,
+    args: Sequence[Union[str, int, float]],
+    arg_info: dict[str, list[dict[str, Any]]],
+) -> bool:
     """
     Function to check text arguments against argument info.
     """
 
-    #get required, optional arguments
-    args_req = arg_info['required']
-    args_opt = arg_info['optional']
+    # get required, optional arguments
+    args_req = arg_info["required"]
+    args_opt = arg_info["optional"]
 
-    #check that we have enough args
+    # check that we have enough args
     if len(args_req) > len(args):
-        req_table = tabulate.tabulate([[x['name'], x['type']] for x in args_req],
-                                      ['req arg', 'type'], tablefmt='pretty')
+        req_table = tabulate.tabulate(
+            [[x["name"], x["type"]] for x in args_req],
+            ["req arg", "type"],
+            tablefmt="pretty",
+        )
         warnings.warn(
             f"'{name}': missing required arguments\n{req_table}",
-            UnknownObjectWarning, stacklevel=4
+            UnknownObjectWarning,
+            stacklevel=4,
         )
         return False
 
-    #check all type, argument pairs are valid
-    req_types = [arg['type'] for arg in args_req]
-    if not all([tc.check_type(t, a) for t, a in zip(req_types, args[:len(args_req)])]):
-        req_table = tabulate.tabulate([[x['name'], x['type']] for x in args_req],
-                                      ['req arg', 'type'], tablefmt='pretty')
+    # check all type, argument pairs are valid
+    req_types = [arg["type"] for arg in args_req]
+    if not all([tc.check_type(t, a) for t, a in zip(req_types, args[: len(args_req)])]):
+        req_table = tabulate.tabulate(
+            [[x["name"], x["type"]] for x in args_req],
+            ["req arg", "type"],
+            tablefmt="pretty",
+        )
         warnings.warn(
             f"'{name}': bad type(s) for required arguments\n{req_table}",
-            UnknownObjectWarning, stacklevel=4
+            UnknownObjectWarning,
+            stacklevel=4,
         )
         return False
 
-    #check remaining args against optional args
-    opt_types = [arg['type'] for arg in args_opt]
-    if not all([tc.check_type(t, a) for t, a in zip(opt_types, args[len(args_req):])]):
-        req_table = tabulate.tabulate([[x['name'], x['type']] for x in args_req],
-                                      ['req arg', 'type'], tablefmt='pretty')
-        opt_table = tabulate.tabulate([[x['name'], x['type']] for x in args_opt],
-                                      ['opt arg', 'type'], tablefmt='pretty')
+    # check remaining args against optional args
+    opt_types = [arg["type"] for arg in args_opt]
+    if not all([tc.check_type(t, a) for t, a in zip(opt_types, args[len(args_req) :])]):
+        req_table = tabulate.tabulate(
+            [[x["name"], x["type"]] for x in args_req],
+            ["req arg", "type"],
+            tablefmt="pretty",
+        )
+        opt_table = tabulate.tabulate(
+            [[x["name"], x["type"]] for x in args_opt],
+            ["opt arg", "type"],
+            tablefmt="pretty",
+        )
         warnings.warn(
             f"'{name}': bad type(s) for optional arguments\n{req_table}\n{opt_table}",
-            UnknownObjectWarning, stacklevel=4
+            UnknownObjectWarning,
+            stacklevel=4,
         )
         return False
 
     if self.arg_warning:
         if len(args_req) > 0:
-            print("(arg_warning):", name,": args may have special reqs," +
-                  " check official docs for details")
-            #give warning abt required text arguments, if flag is on
+            print(
+                "(arg_warning):",
+                name,
+                ": args may have special reqs," + " check official docs for details",
+            )
+            # give warning abt required text arguments, if flag is on
 
     return True
 
 
-def get_typed_args(self, args):
+def get_typed_args(
+    self: "MaxObject", args: Sequence[str]
+) -> list[Union[str, int, float]]:
     """
     Turn string args into floats or ints.
 
     (so far only used for special vst case)
     """
-    typed_args = []
+    typed_args: list[Union[str, int, float]] = []
     for arg in args:
         if tc.check_int(arg):
             typed_args.append(int(arg))
