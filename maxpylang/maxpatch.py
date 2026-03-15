@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, Any, cast
 
 from .maxobject import MaxObject
 from .tools import constants as _constants
@@ -16,11 +16,14 @@ from .tools.patchfuncs import patchcords as _patchcords
 from .tools.patchfuncs import placing as _placing
 from .tools.patchfuncs import saving as _saving
 
-JSONDict = dict[str, object]
+JSONDict = dict[str, Any]
 ObjectDict = dict[str, MaxObject]
-ConnectionSpec = list[object]
+ConnectionSpec = list[Any]
 ConnectionCollection = list[ConnectionSpec]
 _MAX_LEGACY_FLAGS = 2
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def _type_error(message: str) -> TypeError:
@@ -303,7 +306,7 @@ class MaxPatch:
 
     def place_check_args(
         self,
-        objs: object,
+        objs: _placing.ObjectSequence,
         *args: object,
         **options: object,
     ) -> tuple[_placing.CountSpec, _placing.Position | None]:
@@ -336,7 +339,7 @@ class MaxPatch:
         _assert_no_options(options)
         return _placing.place_check_args(
             self,
-            cast("_placing.ObjectSequence", objs),
+            objs,
             randpick,
             num_objs,
             seed,
@@ -348,7 +351,7 @@ class MaxPatch:
 
     def place_pick_objs(
         self,
-        objs: object,
+        objs: _placing.ObjectSequence,
         *args: object,
         **options: object,
     ) -> list[_placing.ObjectSpec]:
@@ -368,7 +371,7 @@ class MaxPatch:
         _assert_no_options(options)
         return _placing.place_pick_objs(
             self,
-            cast("_placing.ObjectSequence", objs),
+            objs,
             randpick,
             num_objs,
             seed,
@@ -483,22 +486,31 @@ class MaxPatch:
         """Swap retained patchcords during replacement."""
         _patchcords.swap_patchcords(self, new, old)
 
-    def check_connection_format(self, connections: object) -> None:
+    def check_connection_format(
+        self,
+        connections: tuple[ConnectionSpec, ...] | list[ConnectionSpec],
+    ) -> None:
         """Validate patchcord connection formatting."""
         _patchcords.check_connection_format(self, connections)
 
-    def check_connection_typing(self, connections: object) -> object:
+    def check_connection_typing(
+        self,
+        connections: tuple[ConnectionSpec, ...] | list[ConnectionSpec],
+    ) -> list[ConnectionSpec]:
         """Filter patchcords by type compatibility."""
         return _patchcords.check_connection_typing(self, connections)
 
-    def check_connection_exists(self, connections: object) -> list[ConnectionSpec]:
+    def check_connection_exists(
+        self,
+        connections: tuple[ConnectionSpec, ...] | list[ConnectionSpec],
+    ) -> list[ConnectionSpec]:
         """Filter patchcords to those that currently exist."""
         return _patchcords.check_connection_exists(self, connections)
 
     def delete(
         self,
-        objs: object = None,
-        cords: object = None,
+        objs: Sequence[str] | None = None,
+        cords: Sequence[ConnectionSpec] | None = None,
         *args: object,
         **options: object,
     ) -> None:

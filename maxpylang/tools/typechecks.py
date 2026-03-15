@@ -1,13 +1,13 @@
 """Helpers for checking MaxPyLang argument datatypes."""
 
 from collections.abc import Sequence
-from typing import Callable
+from typing import Callable, cast
 
 
 def check_number(arg: object) -> bool:
     """Return whether ``arg`` can be interpreted as a number."""
     try:
-        float(arg)
+        float(cast("str | int | float", arg))
     except (TypeError, ValueError):
         return False
     else:
@@ -23,7 +23,7 @@ def check_any(arg: object) -> bool:
 def check_int(arg: object) -> bool:
     """Return whether ``arg`` can be interpreted as an integer."""
     try:
-        int(arg)
+        int(cast("str | bytes | bytearray | int | float", arg))
     except (TypeError, ValueError):
         return False
     else:

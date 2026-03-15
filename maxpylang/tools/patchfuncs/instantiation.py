@@ -5,14 +5,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from maxpylang.maxobject import MaxObject
 
 if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
-JSONDict = dict[str, object]
+JSONDict = dict[str, Any]
 
 
 def _write_stdout(*parts: object) -> None:
@@ -78,8 +78,8 @@ def load_objs_from_dict(
 ) -> None:
     """Load box objects from a serialized patch dictionary."""
     self._num_objs = 0
-    patcher = cast("dict[str, object]", patch_dict["patcher"])
-    for box in cast("list[object]", patcher["boxes"]):
+    patcher = cast("dict[str, Any]", patch_dict["patcher"])
+    for box in cast("list[Any]", patcher["boxes"]):
         obj = MaxObject(box, from_dict=True)
         self._num_objs += 1
         self._objs[obj.box_id] = obj
@@ -94,32 +94,28 @@ def load_patchcords_from_dict(
     verbose: bool = True,
 ) -> None:
     """Load patchcords from a serialized patch dictionary."""
-    patcher = cast("dict[str, object]", patch_dict["patcher"])
-    for line in cast("list[object]", patcher["lines"]):
-        line_dict = cast("dict[str, object]", line)
-        patchline = cast("dict[str, object]", line_dict["patchline"])
-        source = cast("list[object]", patchline["source"])
-        destination = cast("list[object]", patchline["destination"])
-        midpoints = [None]
-        if "midpoints" in patchline:
-            midpoints = cast("list[object]", patchline["midpoints"])
-
+    patcher = cast("dict[str, Any]", patch_dict["patcher"])
+    for line in cast("list[Any]", patcher["lines"]):
+        line_dict = cast("dict[str, Any]", line)
+        patchline = cast("dict[str, Any]", line_dict["patchline"])
+        source = cast("list[Any]", patchline["source"])
+        destination = cast("list[Any]", patchline["destination"])
         source_obj = self._objs[cast("str", source[0])]
         destination_obj = self._objs[cast("str", destination[0])]
-        self.connect(
-            [
-                source_obj.outs[cast("int", source[1])],
-                destination_obj.ins[cast("int", destination[1])],
-                midpoints,
-            ],
-            verbose=verbose,
+        connection = [
+            source_obj.outs[cast("int", source[1])],
+            destination_obj.ins[cast("int", destination[1])],
+        ]
+        connection.append(
+            cast("list[float | None]", patchline.get("midpoints", [None])),
         )
+        self.connect(connection, verbose=verbose)
 
 
 def clean_patcher_dict(self: MaxPatch, patch_dict: JSONDict) -> JSONDict:
     """Strip box and patchcord data from a patch dictionary."""
     del self
-    patcher = cast("dict[str, object]", patch_dict["patcher"])
+    patcher = cast("dict[str, Any]", patch_dict["patcher"])
     patcher["boxes"] = []
     patcher["lines"] = []
     return patch_dict

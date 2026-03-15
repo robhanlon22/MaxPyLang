@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 _MAXPY_PATH = Path(__file__).resolve().parent.parent
 _DATA_PATH = _MAXPY_PATH / "data"
@@ -23,7 +24,7 @@ def _constants_path() -> Path:
 
 
 # common box attributes available to all non-ui objects
-common_box_attribs: list[dict[str, object]] = [
+common_box_attribs: list[dict[str, Any]] = [
     {"name": "annotation", "type": "symbol", "size": 1},
     {"name": "background", "type": "int", "size": 1},  # 0 or 1
     {"name": "color", "type": "float", "size": 4},
@@ -44,7 +45,7 @@ common_box_attribs: list[dict[str, object]] = [
 ]
 
 
-unknown_obj_dict: dict[str, object] = {
+unknown_obj_dict: dict[str, Any] = {
     "box": {
         "id": "obj-1",
         "maxclass": "newobj",

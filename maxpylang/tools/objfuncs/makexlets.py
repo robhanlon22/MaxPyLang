@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import operator
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from maxpylang.tools import typechecks as tc
 from maxpylang.tools.misc import write_stdout
@@ -12,8 +12,8 @@ from maxpylang.xlet import Inlet, Outlet
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
-ObjectInfo = dict[str, object]
-Comparator = dict[str, object]
+ObjectInfo = dict[str, Any]
+Comparator = dict[str, Any]
 _COMPARATORS = {
     "<": operator.lt,
     "<=": operator.le,
@@ -42,7 +42,7 @@ def make_xlets_from_self_dict(self: MaxObject) -> None:
     num_outlets = cast("int", box["numoutlets"])
 
     self._ins = [Inlet(self, index) for index in range(num_inlets)]
-    out_types = cast("list[object]", box.get("outlettype", [None] * num_outlets))
+    out_types = cast("list[Any]", box.get("outlettype", [None] * num_outlets))
     normalized_types = [
         "any" if out_type == "" else out_type for out_type in list(out_types)
     ]
@@ -54,8 +54,8 @@ def make_xlets_from_self_dict(self: MaxObject) -> None:
 
 def update_ins_outs(
     self: MaxObject,
-    inout_info: dict[str, object],
-    default_info: dict[str, object],
+    inout_info: dict[str, Any],
+    default_info: dict[str, Any],
 ) -> None:
     """Update inlet and outlet counts from object metadata."""
     del default_info
@@ -68,7 +68,7 @@ def update_ins_outs(
         current_xlets = self._ins if xlet_type == "numinlets" else self._outs
         curr_count = len(current_xlets)
         new_count = self.parse_io_num(
-            cast("list[dict[str, object]]", inout_info[xlet_type]),
+            cast("list[dict[str, Any]]", inout_info[xlet_type]),
             curr_count,
         )
         diff = new_count - curr_count
@@ -89,6 +89,7 @@ def parse_io_num(self: MaxObject, info: list[ObjectInfo], default_num: int) -> i
     total = 0
     for term in info:
         argtype = term["argtype"]
+        args: list[Any]
         if argtype == "n":
             args = [int(float(arg)) for arg in self._args if tc.check_number(arg)]
         else:
@@ -166,12 +167,12 @@ def update_dict_io_nums(self: MaxObject) -> None:
 
 def update_xlet_typing(
     self: MaxObject,
-    info: dict[str, object],
+    info: dict[str, Any],
     xlet_type: str,
     num_xlets: int,
 ) -> None:
     """Update inlet and outlet type metadata."""
-    type_info = cast("list[dict[str, object]]", info[xlet_type])[0]["type"]
+    type_info = cast("list[dict[str, Any]]", info[xlet_type])[0]["type"]
     new_types = self.parse_io_typing(type_info, num_xlets)
 
     if xlet_type == "numoutlets":
@@ -187,16 +188,20 @@ def update_xlet_typing(
             self._outs[index].__dict__["_types"] = normalized_types[index]
 
 
-def parse_io_typing(self: MaxObject, type_info: object, num_xlets: int) -> list[object]:
+def parse_io_typing(
+    self: MaxObject,
+    type_info: object,
+    num_xlets: int,
+) -> list[object]:
     """Parse xlet typing metadata into a per-xlet type list."""
     if isinstance(type_info, str) or type_info is None:
         if type_info == "trigger_out":
-            return self.get_trigger_out_types()
+            return cast("list[object]", self.get_trigger_out_types())
         if type_info == "unpack_out":
-            return self.get_unpack_out_types()
+            return cast("list[object]", self.get_unpack_out_types())
         return [type_info] * num_xlets
 
-    info_dict = cast("dict[str, object]", type_info)
+    info_dict = cast("dict[str, Any]", type_info)
     new_types: list[object] = [info_dict["default"]] * num_xlets
 
     if "first" in info_dict:

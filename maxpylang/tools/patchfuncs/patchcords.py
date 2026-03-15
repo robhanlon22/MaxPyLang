@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from maxpylang.xlet import Inlet, Outlet
 
@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
     from maxpylang.maxpatch import MaxPatch
 
-Connection = list[object]
+Connection = list[Any]
 _CONNECTION_WITH_MIDPOINTS = 3
 
 
@@ -37,9 +37,9 @@ def connect(
     for connection in valid_connections:
         outlet = cast("Outlet", connection[0])
         inlet = cast("Inlet", connection[1])
-        midpoints = [None]
+        midpoints: list[float | None] | None = [None]
         if len(connection) == _CONNECTION_WITH_MIDPOINTS:
-            midpoints = cast("list[object]", connection[2])
+            midpoints = cast("list[float | None]", connection[2])
 
         inlet.add_source(outlet, midpoints)
         outlet.add_destination(inlet)

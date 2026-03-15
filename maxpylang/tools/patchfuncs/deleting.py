@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from maxpylang.xlet import Inlet, Outlet
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from maxpylang.maxpatch import MaxPatch
 
-Connection = list[object]
+Connection = list[Any]
 
 
 def _assertion_error(message: str) -> AssertionError:

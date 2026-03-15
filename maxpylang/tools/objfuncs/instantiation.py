@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
-ObjectDict = dict[str, object]
-SerializedObject = dict[str, object]
+ObjectDict = dict[str, Any]
+SerializedObject = dict[str, Any]
 
 
 def build_from_specs(

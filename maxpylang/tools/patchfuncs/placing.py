@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 import sys
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Union, cast
+from typing import TYPE_CHECKING, Any, Union, cast
 
 import numpy as np
 
@@ -14,7 +14,7 @@ from maxpylang.maxobject import MaxObject
 if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
-ObjectSpec = Union[str, MaxObject, list[object]]
+ObjectSpec = Union[str, MaxObject, list[Any]]
 ObjectSequence = Sequence[ObjectSpec]
 CountValue = Union[int, float]
 CountSpec = Union[CountValue, list[CountValue], None]

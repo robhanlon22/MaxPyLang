@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
-ObjectDict = dict[str, object]
+ObjectDict = dict[str, Any]
 
 
 def move(self: MaxObject, x: float, y: float) -> None:
@@ -30,7 +30,7 @@ def edit(
         write_stdout("       nothing edited")
         return
 
-    new_args: list[object] = []
+    new_args: list[Any] = []
     new_text_attribs: ObjectDict = {}
 
     if text is not None:

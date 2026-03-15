@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Union
 
 from .tools import constants as _constants
 from .tools import misc
@@ -18,12 +18,15 @@ from .tools.objfuncs import specialobjs as _specialobjs
 from .tools.objfuncs import text as _text
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+
     from .xlet import Inlet, Outlet
 
-ObjectValue = object
-ObjectDict = dict[str, ObjectValue]
-ObjectArgs = list[ObjectValue]
-ObjectInfoList = list[dict[str, ObjectValue]]
+Atom = Union[str, int, float]
+ObjectValue = Any
+ObjectDict = dict[str, Any]
+ObjectArgs = list[Atom]
+ObjectInfoList = list[dict[str, Any]]
 
 
 def _write_stdout(*parts: object) -> None:
@@ -183,8 +186,8 @@ class MaxObject:
 
     def update_ins_outs(
         self,
-        inout_info: dict[str, ObjectValue],
-        default_info: dict[str, ObjectValue],
+        inout_info: dict[str, Any],
+        default_info: dict[str, Any],
     ) -> None:
         """Update inlet and outlet counts from parsed metadata."""
         _makexlets.update_ins_outs(self, inout_info, default_info)
@@ -207,7 +210,7 @@ class MaxObject:
 
     def update_xlet_typing(
         self,
-        info: dict[str, ObjectValue],
+        info: dict[str, Any],
         xlet_type: str,
         num_xlets: int,
     ) -> None:
@@ -221,13 +224,13 @@ class MaxObject:
     def args_valid(
         self,
         name: str,
-        args: list[object],
-        arg_info: dict[str, ObjectValue],
+        args: ObjectArgs,
+        arg_info: dict[str, Any],
     ) -> bool:
         """Validate object args against reference metadata."""
         return _args.args_valid(self, name, args, arg_info)
 
-    def get_typed_args(self, args: list[str]) -> list[object]:
+    def get_typed_args(self, args: list[str]) -> ObjectArgs:
         """Cast parsed string args into typed Python values."""
         return _args.get_typed_args(self, args)
 
@@ -239,7 +242,7 @@ class MaxObject:
         self,
         text_attribs: ObjectDict,
         extra_attribs: ObjectDict,
-        attrib_info: ObjectInfoList,
+        attrib_info: Sequence[Mapping[str, Any]],
     ) -> tuple[ObjectDict, ObjectDict]:
         """Split valid text attributes from extra attributes."""
         return _attribs.get_all_valid_attribs(
@@ -252,7 +255,7 @@ class MaxObject:
     def remove_bad_attribs(
         self,
         attribs: ObjectDict,
-        attrib_speclist: ObjectInfoList,
+        attrib_speclist: Sequence[Mapping[str, Any]],
     ) -> ObjectDict:
         """Drop attributes not supported by the object metadata."""
         return _attribs.remove_bad_attribs(self, attribs, attrib_speclist)

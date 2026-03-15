@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
-PatchObject = object
+PatchObject = Any
 PatchObjectMap = dict[str, PatchObject]
 
 _UNKNOWN_HEADER = "PatchCheck: unknown objects :"

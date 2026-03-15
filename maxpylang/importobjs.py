@@ -12,7 +12,7 @@ import textwrap
 import time
 import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol, Union
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from .maxpatch import MaxPatch
 from .tools.constants import (
@@ -49,32 +49,14 @@ class _ElementTreeLike(Protocol):
     def getroot(self) -> _ElementLike: ...
 
 
-JSONValue = Union[
-    str,
-    int,
-    float,
-    bool,
-    None,
-    list["JSONValue"],
-    dict[str, "JSONValue"],
-]
-JSONDict = dict[str, JSONValue]
+JSONValue = Any
+JSONDict = dict[str, Any]
 PackagePaths = dict[str, Path]
-ArgSpec = dict[str, Union[str, list[str], int, float, bool, None]]
+ArgSpec = dict[str, Any]
 ArgSections = dict[str, list[ArgSpec]]
-AttribList = list[dict[str, str]]
+AttribList = list[dict[str, Any]]
 ArgStatus = Literal["required", "optional"]
-JSONFileData = Union[
-    list[JSONDict],
-    JSONDict,
-    dict[str, str],
-    list[str],
-    str,
-    int,
-    float,
-    bool,
-    None,
-]
+JSONFileData = Any
 
 _DOC_WIDTH = 88
 _json_width = 2
@@ -98,8 +80,8 @@ def import_objs(*packages: str, overwrite: bool = False) -> None:
 
 def get_package_paths(packages: Iterable[str]) -> PackagePaths:
     """Build filesystem locations for Max package reference files."""
-    vanilla_refpath = Path(get_constant("max_refpath"))
-    packages_refpath = Path(get_constant("packages_path"))
+    vanilla_refpath = Path(cast("str", get_constant("max_refpath")))
+    packages_refpath = Path(cast("str", get_constant("packages_path")))
 
     resolved_packages: list[str] = []
     for package in packages:
@@ -212,7 +194,7 @@ def get_default_obj_info(
     names: list[str],
 ) -> dict[str, JSONDict]:
     """Place objects in a patch and extract saved default arguments."""
-    wait_time = float(get_constant("wait_time"))
+    wait_time = float(cast("str | int | float", get_constant("wait_time")))
     patch = MaxPatch(verbose=False)
     add_save_close(patch)
     add_barebones_objs(refs, patch)
@@ -268,13 +250,13 @@ def get_objarg_info(refs: list[Path], names: list[str]) -> dict[str, ArgSections
     return objarg_info
 
 
-def get_objargs_by_flag(root: _ElementTreeLike, flag: str) -> list[ArgSpec]:
+def get_objargs_by_flag(root: _ElementLike, flag: str) -> list[ArgSpec]:
     """Extract object arguments from an XML element matching a flag."""
     findstring = "./objarglist/objarg" + flag
     args: list[ArgSpec] = []
 
     for objarg in root.findall(findstring):
-        objarg_info = dict(objarg.attrib)
+        objarg_info: ArgSpec = dict(objarg.attrib)
         if not (
             objarg_info["name"] == "OBJARG_NAME"
             and objarg_info["type"] == "OBJARG_TYPE"
@@ -311,12 +293,10 @@ def get_objattrib_info(refs: list[Path], names: list[str]) -> dict[str, AttribLi
     return objattrib_info
 
 
-def get_objinout_info(
-    package: str, names: list[str]
-) -> dict[str, dict[str, JSONValue]]:
+def get_objinout_info(package: str, names: list[str]) -> dict[str, JSONDict]:
     """Extract I/O relationship metadata for each object."""
     info_file = Path(obj_io_folder) / f"{package}_io.json"
-    info: dict[str, dict[str, JSONValue]] = {}
+    info: dict[str, JSONDict] = {}
     if info_file.exists():
         info = _read_json(info_file)
 
@@ -373,7 +353,7 @@ def _read_xlet_metadata(nodes: list[_ElementLike]) -> list[JSONDict]:
 
 def _read_method_metadata(method: _ElementLike) -> JSONDict:
     """Read method metadata and nested argument details."""
-    method_info = dict(method.attrib)
+    method_info: JSONDict = dict(method.attrib)
     _set_optional_text(method_info, "digest", method.find("digest"))
     _set_optional_text(method_info, "description", method.find("description"))
 
@@ -496,7 +476,7 @@ def _append_methods(lines: list[str], methods: list[JSONDict] | None) -> None:
     lines.extend(_wrap_lines([", ".join(method_names)], prefix="  "))
 
 
-def _append_attributes(lines: list[str], attribs: list[dict[str, str]]) -> None:
+def _append_attributes(lines: list[str], attribs: list[dict[str, Any]]) -> None:
     """Append attributes section."""
     attrib_names = [
         attrib.get("name", "")
@@ -672,16 +652,16 @@ def _object_name_from_ref(ref: Path) -> str:
 
 def _read_json(path: Path) -> JSONDict:
     """Read a JSON file into a dictionary."""
-    with path.open() as f:
-        return json.load(f)
+    with path.open(encoding="utf-8") as f:
+        return cast("JSONDict", json.load(f))
 
 
 def _write_json(path: Path, data: JSONFileData) -> None:
     """Write JSON data to disk with consistent indentation."""
-    with path.open("w") as f:
+    with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=_json_width)
 
 
 def _parse_xml(path: str | Path) -> _ElementTreeLike:
     """Parse an XML file with the configured parser."""
-    return _xml_parser.parse(Path(path).as_posix())
+    return cast("_ElementTreeLike", _xml_parser.parse(Path(path).as_posix()))

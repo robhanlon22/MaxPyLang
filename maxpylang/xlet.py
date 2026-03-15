@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, Union
 if TYPE_CHECKING:
     from .maxobject import MaxObject
 
-Midpoint = Optional[list[float]]
+Midpoint = Optional[list[Optional[float]]]
 XletTypes = Union[list[str], str, None]
 
 
@@ -49,7 +49,7 @@ class Inlet:
         self._midpoints = (
             midpoints or []
         )  # list of midpoints (this info only in inlet of outlet, inlet pair)
-        self._types = types or []  # allowed connection types
+        self._types: XletTypes = [] if types is None else types  # allowed types
         self._index = index  # index in parent object, starting from 0
 
     # some properties for getting info...
@@ -134,7 +134,7 @@ class Outlet:
         """Initialize an outlet for the given parent object."""
         self._parent = parent  # parent MaxObject
         self._destinations = destinations or []  # list of Inlets
-        self._types = types or []  # output types
+        self._types: XletTypes = [] if types is None else types  # output types
         self._index = index  # index in parent object, starting from 0
 
     # some properties for getting info...

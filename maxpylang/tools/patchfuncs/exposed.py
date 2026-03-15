@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
@@ -75,17 +75,17 @@ def replace(
         return
 
     old_obj = self._objs[curr_obj_num]
-    old_box = cast("dict[str, object]", old_obj.raw_dict["box"])
+    old_box = cast("dict[str, Any]", old_obj.raw_dict["box"])
     position = cast("list[float]", old_box["patching_rect"][:2])
     old_name = old_obj.name
 
     replacement = self.get_obj_from_spec(
-        cast("str | MaxObject | list[object]", new_obj),
+        cast("str | MaxObject | list[Any]", new_obj),
     )
     if retain:
         replacement.retain_attribs(old_obj)
 
-    replacement.edit(**new_attribs)
+    replacement.edit(**cast("dict[str, Any]", new_attribs))
     self.swap_patchcords(replacement, old_obj)
     self.delete_objs(curr_obj_num, verbose=verbose)
     self.place_obj(

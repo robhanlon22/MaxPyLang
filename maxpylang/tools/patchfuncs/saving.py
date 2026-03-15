@@ -6,12 +6,12 @@ import copy
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
-JSONDict = dict[str, object]
+JSONDict = dict[str, Any]
 
 
 def _write_stdout(*parts: object) -> None:
@@ -44,10 +44,10 @@ def save(
 
 def get_json(self: MaxPatch) -> JSONDict:
     """Return the patch dictionary with boxes and lines populated."""
-    json_dict = cast("JSONDict", copy.deepcopy(self._patcher_dict))
-    patcher = cast("dict[str, object]", json_dict["patcher"])
-    boxes = cast("list[object]", patcher["boxes"])
-    lines = cast("list[object]", patcher["lines"])
+    json_dict = copy.deepcopy(self._patcher_dict)
+    patcher = cast("dict[str, Any]", json_dict["patcher"])
+    boxes = cast("list[Any]", patcher["boxes"])
+    lines = cast("list[Any]", patcher["lines"])
 
     for source_id, obj in self._objs.items():
         boxes.append(obj.raw_dict)

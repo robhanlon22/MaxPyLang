@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from maxpylang.tools import constants as _constants
 from maxpylang.tools import typechecks as tc
@@ -143,7 +143,7 @@ def link_js(self: MaxObject, link_file: str | None = None) -> None:
 def create_abstraction(
     self: MaxObject,
     text: str | None = None,
-    extra_attribs: dict[str, object] | None = None,
+    extra_attribs: dict[str, Any] | None = None,
     *,
     from_dict: bool = True,
 ) -> None:
@@ -171,7 +171,7 @@ def create_abstraction(
 def update_abstraction_from_file(
     self: MaxObject,
     text: str | None,
-    extra_attribs: dict[str, object] | None,
+    extra_attribs: dict[str, Any] | None,
     log_var: str | None = None,
 ) -> None:
     """Refresh abstraction I/O and attributes from the linked file."""
@@ -200,7 +200,7 @@ def create_declared_abstraction(
     text: str,
     numinlets: int,
     numoutlets: int,
-    extra_attribs: dict[str, object],
+    extra_attribs: dict[str, Any],
 ) -> None:
     """Create an abstraction with user-declared inlet and outlet counts."""
     self._ext_file = self.name

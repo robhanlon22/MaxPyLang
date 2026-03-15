@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import tabulate  # type: ignore[import-untyped]
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 Atom = Union[str, int, float]
-ArgSpec = dict[str, object]
+ArgSpec = dict[str, Any]
 ArgInfo = dict[str, list[ArgSpec]]
 
 

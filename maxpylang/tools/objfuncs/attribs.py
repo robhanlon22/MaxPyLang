@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Mapping, Sequence
+from typing import TYPE_CHECKING, Any
 
 from maxpylang.tools import typechecks as tc
 from maxpylang.tools.misc import write_stdout
@@ -10,9 +11,9 @@ from maxpylang.tools.misc import write_stdout
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
-ObjectDict = dict[str, object]
-AttribSpec = dict[str, object]
-AttribSpecList = list[AttribSpec]
+ObjectDict = dict[str, Any]
+AttribSpec = Mapping[str, Any]
+AttribSpecList = Sequence[AttribSpec]
 
 
 def add_extra_attribs(self: MaxObject, extra_attribs: ObjectDict) -> None:
@@ -51,7 +52,7 @@ def remove_bad_attribs(
     """Remove unsupported attributes or invalid attribute values."""
     notvalid: set[str] = set()
     for attrib, raw_vals in attribs.items():
-        vals = [raw_vals] if isinstance(raw_vals, (int, float)) else raw_vals
+        vals = raw_vals if isinstance(raw_vals, list) else [raw_vals]
 
         if len(vals) == 0:
             write_stdout(
