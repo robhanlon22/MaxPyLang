@@ -1,9 +1,16 @@
 """Tests for misc utilities."""
 
+from pathlib import Path
+
+from _pytest.monkeypatch import MonkeyPatch
+
 from maxpylang.tools import misc as tools_misc
 
 
-def test_get_objs_collects_sorted_json_stems_by_package(tmp_path, monkeypatch):
+def test_get_objs_collects_sorted_json_stems_by_package(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Verify get_objs returns sorted names grouped by package."""
     package_root = tmp_path / "OBJ_INFO"
     for package, names in {"jit": ["b", "a"], "max": ["solo"]}.items():
         package_dir = package_root / package

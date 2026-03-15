@@ -1,14 +1,19 @@
+"""Tests for patch deletion helpers."""
+
+from _pytest.capture import CaptureFixture
+
 from maxpylang import MaxPatch
 
 
-def test_delete_get_extra_cords_collects_attached_connections():
+def test_delete_get_extra_cords_collects_attached_connections() -> None:
+    """Verify extra cords from deletion include connected endpoints."""
     patch = MaxPatch(verbose=False)
     source = patch.place("toggle", verbose=False)[0]
     destination = patch.place("number", verbose=False)[0]
 
     patch.connect([source.outs[0], destination.ins[0]], verbose=False)
 
-    extra = patch.delete_get_extra_cords(source._dict["box"]["id"])
+    extra = patch.delete_get_extra_cords(source.__dict__["_dict"]["box"]["id"])
     assert len(extra) == 1
     assert extra[0] == [source.outs[0], destination.ins[0]]
 
@@ -16,15 +21,18 @@ def test_delete_get_extra_cords_collects_attached_connections():
     assert source.outs[0].destinations == [destination.ins[0]]
 
 
-def test_delete_objs_remove_objects_and_report_missing(capsys):
+def test_delete_objs_remove_objects_and_report_missing(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify remove by id handles both present and missing entries."""
     patch = MaxPatch(verbose=False)
     left = patch.place("toggle", verbose=False)[0]
     right = patch.place("number", verbose=False)[0]
     patch.connect([left.outs[0], right.ins[0]], verbose=False)
 
-    patch.delete_objs(left._dict["box"]["id"], verbose=True)
+    patch.delete_objs(left.__dict__["_dict"]["box"]["id"], verbose=True)
 
-    assert left._dict["box"]["id"] not in patch.objs
+    assert left.__dict__["_dict"]["box"]["id"] not in patch.objs
     assert right.ins[0].sources == []
     assert patch.num_objs == 1
 
@@ -32,7 +40,10 @@ def test_delete_objs_remove_objects_and_report_missing(capsys):
     assert "delete error: not-found not in patch" in capsys.readouterr().out
 
 
-def test_delete_cords_updates_connections_and_silently_skips_missing(capsys):
+def test_delete_cords_updates_connections_and_silently_skips_missing(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify deleting cords drops endpoints and handles missing ones safely."""
     patch = MaxPatch(verbose=False)
     source = patch.place("toggle", verbose=False)[0]
     destination = patch.place("number", verbose=False)[0]
@@ -44,7 +55,10 @@ def test_delete_cords_updates_connections_and_silently_skips_missing(capsys):
     assert "disconnected:" in capsys.readouterr().out
 
 
-def test_delete_removes_attachments_and_objects_in_one_call(capsys):
+def test_delete_removes_attachments_and_objects_in_one_call(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify combined object/cord deletion keeps structure consistent."""
     patch = MaxPatch(verbose=False)
     source = patch.place("toggle", verbose=False)[0]
     target = patch.place("number", verbose=False)[0]
@@ -58,12 +72,12 @@ def test_delete_removes_attachments_and_objects_in_one_call(capsys):
     output = capsys.readouterr().out
     assert "delete error: not-in-patch not in patch" in output
     assert target.ins[0].sources == []
-    assert source._dict["box"]["id"] in patch.objs
-    assert target._dict["box"]["id"] in patch.objs
+    assert source.__dict__["_dict"]["box"]["id"] in patch.objs
+    assert target.__dict__["_dict"]["box"]["id"] in patch.objs
 
     patch.delete(
-        objs=[target._dict["box"]["id"]],
+        objs=[target.__dict__["_dict"]["box"]["id"]],
         cords=[],
         verbose=True,
     )
-    assert target._dict["box"]["id"] not in patch.objs
+    assert target.__dict__["_dict"]["box"]["id"] not in patch.objs

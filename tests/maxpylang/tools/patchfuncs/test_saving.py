@@ -1,9 +1,14 @@
 """Tests for save and serialization helpers."""
 
+from pathlib import Path
+
+from _pytest.capture import CaptureFixture
+
 from maxpylang import MaxPatch
 
 
-def test_get_json_captures_boxes_and_patchcords():
+def test_get_json_captures_boxes_and_patchcords() -> None:
+    """Verify get_json includes all boxes and lines."""
     patch = MaxPatch(verbose=False)
     source = patch.place("toggle", verbose=False)[0]
     destination = patch.place("number", verbose=False)[0]
@@ -23,7 +28,10 @@ def test_get_json_captures_boxes_and_patchcords():
     }
 
 
-def test_save_writes_file_and_runs_check_when_verbose(tmp_path, capsys):
+def test_save_writes_file_and_runs_check_when_verbose(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify save writes file and runs patch check when verbose."""
     patch = MaxPatch(verbose=False)
     patch.place("definitely_unknown", verbose=False)
     save_path = tmp_path / "generated"
@@ -36,7 +44,8 @@ def test_save_writes_file_and_runs_check_when_verbose(tmp_path, capsys):
     assert "maxpatch saved to" in output
 
 
-def test_save_skips_patch_check_when_disabled(tmp_path):
+def test_save_skips_patch_check_when_disabled(tmp_path: Path) -> None:
+    """Verify save can skip patch checking."""
     patch = MaxPatch(verbose=False)
     output_file = tmp_path / "noself.maxpat"
     patch.save(str(output_file), verbose=False, check=False)

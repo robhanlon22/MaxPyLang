@@ -5,7 +5,8 @@ from types import SimpleNamespace
 from maxpylang.tools.objfuncs import misc as obj_misc
 
 
-def test_obj_misc_notknown_and_repr():
+def test_obj_misc_notknown_and_repr() -> None:
+    """Verify namespace helpers infer known and unknown objects."""
     unknown = SimpleNamespace(
         _ref_file=None,
         name="cycle~",

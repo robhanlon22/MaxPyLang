@@ -2,17 +2,23 @@
 
 from types import SimpleNamespace
 
+from _pytest.capture import CaptureFixture
+
 from maxpylang import MaxObject
 
 
-def test_add_and_get_extra_attribs():
+def test_add_and_get_extra_attribs() -> None:
+    """Verify extra attribute collection can be updated and retrieved."""
     obj = MaxObject("button")
     obj.add_extra_attribs({"presentation": 1})
     extra = obj.get_extra_attribs()
     assert extra["presentation"] == 1
 
 
-def test_remove_bad_attribs_filtering_and_messages(capsys):
+def test_remove_bad_attribs_filtering_and_messages(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify invalid attribute values are dropped and diagnostic text is shown."""
     obj = MaxObject("message")
     cleaned = obj.remove_bad_attribs(
         {
@@ -37,7 +43,8 @@ def test_remove_bad_attribs_filtering_and_messages(capsys):
     assert "no argument given for attribute empty" in attrib_output
 
 
-def test_remove_bad_attribs_accepts_string_sizes_and_keeps_valid_scalar_fields():
+def test_remove_bad_attribs_with_string_sizes_keeps_valid_scalars() -> None:
+    """Verify size strings are accepted and valid scalar fields remain."""
     obj = MaxObject("message")
     cleaned = obj.remove_bad_attribs(
         {
@@ -53,10 +60,14 @@ def test_remove_bad_attribs_accepts_string_sizes_and_keeps_valid_scalar_fields()
             {"name": "wrong", "type": "int", "size": "1"},
         ],
     )
-    assert cleaned == {"good": [1], "noval": []}
+    assert cleaned == {
+        "good": [1],
+        "noval": [],
+    }
 
 
-def test_get_all_valid_attribs_with_common_box_fields():
+def test_get_all_valid_attribs_with_common_box_fields() -> None:
+    """Verify common box fields remain visible in valid attribute output."""
     obj = MaxObject("message")
     attrib_specs = [
         {"name": "fontsize", "type": "float", "size": 1},
@@ -72,12 +83,13 @@ def test_get_all_valid_attribs_with_common_box_fields():
     assert "bogus" not in extra_attribs
 
 
-def test_retain_attribs_calls_edit_with_other_attribs():
+def test_retain_attribs_calls_edit_with_other_attribs() -> None:
+    """Verify retain logic forwards attributes into object.edit."""
     source = SimpleNamespace(get_extra_attribs=lambda: {"presentation": 2})
     target = MaxObject("message")
     called = {}
 
-    def fake_edit(**kwargs):
+    def fake_edit(**kwargs: object) -> None:
         called.update(kwargs)
 
     target.edit = fake_edit

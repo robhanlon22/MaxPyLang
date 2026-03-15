@@ -1,13 +1,21 @@
+"""Tests for patch checking helpers."""
+
+from pathlib import Path
 from types import SimpleNamespace
+
+from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
 from maxpylang.tools.patchfuncs import checking
 
 
-def test_check_reports_sections_for_unknown_js_and_abstraction_flags(tmp_path, capsys):
+def test_check_reports_sections_for_unknown_js_and_abstraction_flags(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify patch check emits all object category sections."""
     patch = MaxPatch(verbose=False)
 
-    patch._objs = {
+    patch.__dict__["_objs"] = {
         "obj-1": SimpleNamespace(name="bad", _ref_file=None, _ext_file=None),
         "obj-2": SimpleNamespace(name="js", _ext_file="missing.js", _ref_file="js"),
         "obj-3": SimpleNamespace(
@@ -32,9 +40,10 @@ def test_check_reports_sections_for_unknown_js_and_abstraction_flags(tmp_path, c
     )
 
 
-def test_check_empty_sections_and_getters():
+def test_check_empty_sections_and_getters() -> None:
+    """Verify helper getters return expected sections when empty."""
     patch = MaxPatch(verbose=False)
-    patch._objs = {
+    patch.__dict__["_objs"] = {
         "obj-1": SimpleNamespace(
             name="toggle", _ref_file="abstraction", _ext_file="toggle.maxpat"
         ),
@@ -42,13 +51,18 @@ def test_check_empty_sections_and_getters():
 
     assert patch.check("unknowns", "js", "abstractions") is None
     assert checking.get_unknowns(patch) == {}
-    assert checking.get_abstractions(patch) == {"obj-1": patch._objs["obj-1"]}
+    assert checking.get_abstractions(patch) == {
+        "obj-1": patch.__dict__["_objs"]["obj-1"]
+    }
     assert checking.get_js_objs(patch) == ({}, {})
 
 
-def test_check_all_includes_all_categories_and_handles_all_alias(tmp_path, capsys):
+def test_check_all_includes_all_categories_and_handles_all_alias(
+    tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify full patch check output includes all object categories."""
     patch = MaxPatch(verbose=False)
-    patch._objs = {
+    patch.__dict__["_objs"] = {
         "obj-1": SimpleNamespace(name="bad", _ref_file=None, _ext_file=None),
         "obj-2": SimpleNamespace(name="js", _ref_file="js", _ext_file=None),
         "obj-3": SimpleNamespace(

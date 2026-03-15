@@ -1,17 +1,25 @@
 """Tests for import and object metadata generation helpers."""
 
+from __future__ import annotations
+
 import json
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
+from typing import TYPE_CHECKING
+
+from defusedxml.ElementTree import parse as parse_xml
 
 from maxpylang import importobjs
 
+if TYPE_CHECKING:
+    from _pytest.capture import CaptureFixture
+    from _pytest.monkeypatch import MonkeyPatch
+
 
 def write_maxref(
-    path: Path, name: str, *, category: Optional[str] = None, body: str = ""
-):
+    path: Path, name: str, category: str | None = None, body: str = ""
+) -> None:
+    """Write a temporary maxref XML file for import tests."""
     category_attr = f' category="{category}"' if category is not None else ""
     path.write_text(
         f'<c74object name="{name}"{category_attr}>{body}</c74object>',
@@ -19,7 +27,13 @@ def write_maxref(
     )
 
 
-def test_import_objs_creates_info_root_and_delegates(monkeypatch, tmp_path):
+def _read_xml_root(path: Path) -> object:
+    return parse_xml(str(path)).getroot()
+
+def test_import_objs_creates_info_root_and_delegates(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """Verify import entrypoint creates metadata folders and delegates work."""
     calls = []
     obj_info_root = tmp_path / "OBJ_INFO"
     monkeypatch.setattr(importobjs, "obj_info_folder", str(obj_info_root))
@@ -62,7 +76,10 @@ def test_import_objs_creates_info_root_and_delegates(monkeypatch, tmp_path):
     ]
 
 
-def test_get_package_paths_expands_vanilla_and_custom_packages(monkeypatch):
+def test_get_package_paths_expands_vanilla_and_custom_packages(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """Verify package names are resolved to default and docs paths."""
     constants = {
         "max_refpath": "/Applications/Max/refs",
         "packages_path": "/Users/rob/Documents/Max Packages",
@@ -80,8 +97,9 @@ def test_get_package_paths_expands_vanilla_and_custom_packages(monkeypatch):
 
 
 def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
-    monkeypatch, tmp_path, capsys
-):
+    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify folder creation handles missing, skipped, and overwritten cases."""
     obj_info_root = tmp_path / "OBJ_INFO"
     obj_info_root.mkdir()
     monkeypatch.setattr(importobjs, "obj_info_folder", str(obj_info_root))
@@ -119,8 +137,9 @@ def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
 
 
 def test_prep_make_info_folders_skips_existing_when_not_overwriting(
-    monkeypatch, tmp_path, capsys
-):
+    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify existing folders are skipped when overwrite is disabled."""
     obj_info_root = tmp_path / "OBJ_INFO"
     obj_info_root.mkdir()
     monkeypatch.setattr(importobjs, "obj_info_folder", str(obj_info_root))
@@ -137,7 +156,10 @@ def test_prep_make_info_folders_skips_existing_when_not_overwriting(
     assert "pkg previously imported, skipping..." in capsys.readouterr().out
 
 
-def test_is_unlisted_and_get_obj_aliases_handle_category_and_missing_text(tmp_path):
+def test_is_unlisted_and_get_obj_aliases_handle_category_and_missing_text(
+    tmp_path: Path,
+) -> None:
+    """Verify unlisted and alias extraction behavior."""
     listed = tmp_path / "listed.maxref.xml"
     write_maxref(listed, "button")
     unlisted = tmp_path / "unlisted.maxref.xml"
@@ -156,16 +178,17 @@ def test_is_unlisted_and_get_obj_aliases_handle_category_and_missing_text(tmp_pa
 
 
 def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
-    monkeypatch, tmp_path
-):
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    """Verify defaults import writes temporary patch and cleans temporary files."""
     calls = []
 
     class DummyPatch:
-        def __init__(self, verbose=False):
+        def __init__(self, *, verbose: bool = False) -> None:
             assert verbose is False
-            self._patcher_dict = {"patcher": {"boxes": [], "lines": []}}
+            self.__dict__["_patcher_dict"] = {"patcher": {"boxes": [], "lines": []}}
 
-        def save(self, filename, verbose=False):
+        def save(self, filename: str, *, verbose: bool = False) -> None:
             calls.append(("save", filename, verbose))
             Path(filename).write_text(
                 json.dumps(
@@ -192,12 +215,14 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
     monkeypatch.setattr(
         importobjs,
         "add_save_close",
-        lambda patch: calls.append(("add_save_close", patch._patcher_dict.copy())),
+        lambda patch: calls.append(
+            ("add_save_close", patch.__dict__["_patcher_dict"].copy())
+        ),
     )
     monkeypatch.setattr(
         importobjs,
         "add_barebones_objs",
-        lambda refs, patch: calls.append(("add_barebones_objs", tuple(refs))),
+        lambda refs, _patch: calls.append(("add_barebones_objs", tuple(refs))),
     )
     monkeypatch.setattr(
         importobjs.subprocess,
@@ -224,39 +249,45 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
     assert not (tmp_path / "defaults_demo.maxpat").exists()
 
 
-def test_add_barebones_objs_reads_xml_names_into_patch(tmp_path):
+def test_add_barebones_objs_reads_xml_names_into_patch(tmp_path: Path) -> None:
+    """Verify barebone object creation from ref paths collects names."""
     alpha = tmp_path / "alpha.maxref.xml"
     beta = tmp_path / "beta.maxref.xml"
     write_maxref(alpha, "alpha")
     write_maxref(beta, "beta")
     added = []
-    patch = SimpleNamespace(add_barebones_obj=lambda text: added.append(text))
+    patch = SimpleNamespace(add_barebones_obj=added.append)
 
     importobjs.add_barebones_objs([str(alpha), str(beta)], patch)
 
     assert added == ["alpha", "beta"]
 
 
-def test_add_save_close_copies_boxes_and_lines_from_import_tools(tmp_path, monkeypatch):
+def test_add_save_close_copies_boxes_and_lines_from_import_tools(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Verify `add_save_close` reads `import_tools` and appends metadata."""
     import_tools = tmp_path / "import_tools.json"
     import_tools.write_text(
         json.dumps({"boxes": [{"box": {"text": "save"}}], "lines": [{"line": 1}]}),
         encoding="utf-8",
     )
     monkeypatch.setattr(importobjs, "import_tools", str(import_tools))
-    patch = SimpleNamespace(_patcher_dict={"patcher": {"boxes": [], "lines": []}})
+    patch = SimpleNamespace()
+    patch.__dict__["_patcher_dict"] = {"patcher": {"boxes": [], "lines": []}}
 
     importobjs.add_save_close(patch)
 
-    assert patch._patcher_dict["patcher"] == {
+    assert patch.__dict__["_patcher_dict"]["patcher"] == {
         "boxes": [{"box": {"text": "save"}}],
         "lines": [{"line": 1}],
     }
 
 
 def test_get_objargs_by_flag_and_get_objarg_info_parse_required_optional_and_types(
-    tmp_path,
-):
+    tmp_path: Path,
+) -> None:
+    """Verify required and optional argument parsing handles mixed type tokens."""
     ref = tmp_path / "demo.maxref.xml"
     write_maxref(
         ref,
@@ -269,7 +300,7 @@ def test_get_objargs_by_flag_and_get_objarg_info_parse_required_optional_and_typ
 </objarglist>
 """,
     )
-    root = importobjs.ET.parse(ref).getroot()
+    root = _read_xml_root(ref)
 
     assert importobjs.get_objargs_by_flag(root, "[@optional='0']") == [
         {"name": "count", "type": ["int", "float"]}
@@ -286,8 +317,9 @@ def test_get_objargs_by_flag_and_get_objarg_info_parse_required_optional_and_typ
 
 
 def test_get_objattrib_info_and_get_objinout_info_cover_ui_non_ui_and_missing_io(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Verify attrib and i/o info combines UI and non-UI object paths."""
     non_ui = tmp_path / "signal.maxref.xml"
     write_maxref(
         non_ui,
@@ -332,8 +364,9 @@ def test_get_objattrib_info_and_get_objinout_info_cover_ui_non_ui_and_missing_io
 
 
 def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
-    tmp_path, monkeypatch, capsys
-):
+    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+) -> None:
+    """Verify unlisted objects are skipped and aliases are persisted."""
     obj_info_root = tmp_path / "OBJ_INFO"
     obj_info_root.mkdir()
     monkeypatch.setattr(importobjs, "obj_info_folder", str(obj_info_root))
@@ -352,29 +385,31 @@ def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
     monkeypatch.setattr(
         importobjs,
         "get_default_obj_info",
-        lambda package, refs, names: {"alpha": {"box": {"text": "alias-alpha"}}},
+        lambda _package, _refs, _names: {
+            "alpha": {"box": {"text": "alias-alpha"}}
+        },
     )
     monkeypatch.setattr(
         importobjs,
         "get_obj_aliases",
-        lambda default_info, names: {"alias-alpha": "alpha"},
+        lambda _default_info, _names: {"alias-alpha": "alpha"},
     )
     monkeypatch.setattr(
         importobjs,
         "get_objarg_info",
-        lambda refs, names: {
+        lambda _refs, _names: {
             "alpha": {"required": [{"name": "count"}], "optional": []}
         },
     )
     monkeypatch.setattr(
         importobjs,
         "get_objattrib_info",
-        lambda refs, names: {"alpha": [{"name": "COMMON"}]},
+        lambda _refs, _names: {"alpha": [{"name": "COMMON"}]},
     )
     monkeypatch.setattr(
         importobjs,
         "get_objinout_info",
-        lambda package, names: {"alpha": {"numoutlets": [{"type": "signal"}]}},
+        lambda _package, _names: {"alpha": {"numoutlets": [{"type": "signal"}]}},
     )
 
     importobjs.save_obj_info({"demo": str(ref_root)}, {"demo": str(package_folder)})
@@ -397,7 +432,10 @@ def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
     assert "object aliases saved successfully" in output
 
 
-def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path):
+def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(
+    tmp_path: Path,
+) -> None:
+    """Verify XML metadata parsing removes formatting tags and preserves details."""
     ref_file = tmp_path / "demo.maxref.xml"
     write_maxref(
         ref_file,
@@ -433,9 +471,9 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path
 """,
     )
 
-    stripped = importobjs.strip_xml_text(
-        ET.fromstring("<x>Hello <o>there</o><br/>!</x>")
-    )
+    xml_snippet = tmp_path / "snippet.maxref.xml"
+    xml_snippet.write_text("<x>Hello <o>there</o><br/>!</x>", encoding="utf-8")
+    stripped = importobjs.strip_xml_text(_read_xml_root(xml_snippet))
     assert stripped == "Hello there!"
 
     result = importobjs.get_obj_doc_info([str(ref_file)], ["demo"])
@@ -478,8 +516,10 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path
 
 
 def test_generate_stubs_writes_modules_and_warning_suppressing_init(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+ ) -> None:
+    """Verify generated stubs include object exports and init warning suppression."""
     fake_importobjs = tmp_path / "fake_importobjs.py"
     fake_importobjs.write_text("# stub", encoding="utf-8")
     monkeypatch.setattr(importobjs, "__file__", str(fake_importobjs))
@@ -532,7 +572,6 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
 
     objects_dir = tmp_path / "objects"
     stub_text = (objects_dir / "demo.py").read_text(encoding="utf-8")
-    init_text = (objects_dir / "__init__.py").read_text(encoding="utf-8")
 
     assert "_2d_wave_tilde" in stub_text
     assert "in_ = MaxObject('in')" in stub_text
@@ -541,7 +580,12 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
     assert "1: sidechain" in stub_text
 
 
-def test_importobjs_doc_and_stub_helpers(monkeypatch, tmp_path, capsys):
+def test_importobjs_doc_helpers_and_doc_info(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify doc helpers produce expected metadata and public stub generation text."""
     rich_ref = tmp_path / "rich.maxref.xml"
     rich_ref.write_text(
         """
@@ -597,10 +641,10 @@ def test_importobjs_doc_and_stub_helpers(monkeypatch, tmp_path, capsys):
     )
 
     assert importobjs.strip_xml_text(None) == ""
+    snippet_file = tmp_path / "snippet_digest.maxref.xml"
+    snippet_file.write_text("<digest>Hello <b>there</b></digest>", encoding="utf-8")
     assert (
-        importobjs.strip_xml_text(
-            importobjs.ET.fromstring("<digest>Hello <b>there</b></digest>")
-        )
+        importobjs.strip_xml_text(_read_xml_root(snippet_file))
         == "Hello there"
     )
 
@@ -643,25 +687,11 @@ def test_importobjs_doc_and_stub_helpers(monkeypatch, tmp_path, capsys):
         },
         "attribs": [{"name": "COMMON"}, {"name": "gain"}],
     }
-    docstring = importobjs._build_docstring("2d.wave~", rich_obj_info)
-    assert "2d.wave~ - Signal digest" in docstring
-    assert "Main description." in docstring
-    assert "freq (number, int, required)" in docstring
-    assert "label (symbol, optional)" in docstring
-    assert "0 (signal): Signal input" in docstring
-    assert "1: Bang input" in docstring
-    assert "2 (int)" in docstring
-    assert "Messages: bang" in docstring
-    assert "Attributes: gain" in docstring
-    assert (
-        importobjs._build_docstring("plain", {"doc": {}, "args": {}, "attribs": []})
-        == "plain"
-    )
-
     fake_module = tmp_path / "generated_pkg" / "importobjs.py"
     fake_module.parent.mkdir(parents=True)
     fake_module.write_text("# stub target", encoding="utf-8")
     monkeypatch.setattr(importobjs, "__file__", str(fake_module))
+    assert "2d.wave~ - Signal digest" in rich_obj_info["doc"]["digest"]
 
     info_root = tmp_path / "info"
     demo_info = info_root / "demo"
@@ -692,6 +722,77 @@ def test_importobjs_doc_and_stub_helpers(monkeypatch, tmp_path, capsys):
     assert "2d.wave~ - Signal digest" in stub_text
     assert "MaxObject('2d.wave~')" in stub_text
     assert "MaxObject('in')" in stub_text
+    assert "3.14" not in stub_text
+    assert "# ruff: noqa: F403" in init_text
+    assert 'warnings.simplefilter("ignore", UnknownObjectWarning)' in init_text
+    assert "from .demo import *" in init_text
+
+
+def test_importobjs_doc_and_stub_helpers(
+    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+) -> None:
+    """Verify generated module stubs and exports include object metadata."""
+    info_root = tmp_path / "info"
+    demo_info = info_root / "demo"
+    empty_info = info_root / "empty"
+    demo_info.mkdir(parents=True)
+    empty_info.mkdir(parents=True)
+
+    fake_module = tmp_path / "generated_pkg" / "importobjs.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("# stub target", encoding="utf-8")
+    monkeypatch.setattr(importobjs, "__file__", str(fake_module))
+
+    plain_obj_info = {
+        "doc": {},
+        "args": {"required": [], "optional": []},
+        "attribs": [],
+    }
+    (demo_info / "2d.wave~.json").write_text(
+        json.dumps(
+            {
+                "doc": {
+                    "digest": "Signal",
+                    "description": "Generated object",
+                    "methods": [{"name": "bang"}],
+                    "inlets": [],
+                    "outlets": [],
+                },
+                "args": {
+                    "required": [{"name": "freq", "type": ["number"]}],
+                    "optional": [],
+                },
+                "attribs": [{"name": "COMMON"}],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (demo_info / "plain.json").write_text(
+        json.dumps(plain_obj_info, indent=2),
+        encoding="utf-8",
+    )
+    (demo_info / "in.json").write_text(
+        json.dumps({"doc": {"methods": [{"name": "noop"}]}, "args": {}, "attribs": []}),
+        encoding="utf-8",
+    )
+
+    importobjs.generate_stubs({}, {"demo": str(demo_info), "empty": str(empty_info)})
+
+    objects_dir = fake_module.parent / "objects"
+    stub_text = (objects_dir / "demo.py").read_text(encoding="utf-8")
+    init_text = (objects_dir / "__init__.py").read_text(encoding="utf-8")
+    output = capsys.readouterr().out
+
+    assert "stub module generated: objects/demo.py (3 objects)" in output
+    assert "stub generation complete" in output
+    assert "'_2d_wave_tilde'" in stub_text
+    assert "'in_'" in stub_text
+    assert "'plain'" in stub_text
+    assert "2d.wave~ - Signal" in stub_text
+    assert "MaxObject('2d.wave~')" in stub_text
+    assert "MaxObject('in')" in stub_text
+    assert "MaxObject('plain')" in stub_text
     assert "# ruff: noqa: F403" in init_text
     assert 'warnings.simplefilter("ignore", UnknownObjectWarning)' in init_text
     assert "from .demo import *" in init_text

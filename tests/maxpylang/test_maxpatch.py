@@ -1,29 +1,63 @@
+"""Tests for patch-level operations."""
+
+from __future__ import annotations
+
 import json
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from _pytest.capture import CaptureFixture
+    from _pytest.monkeypatch import MonkeyPatch
 
 import pytest
 
 from maxpylang import MaxPatch
 from maxpylang.exceptions import UnknownObjectWarning
 
+_UNKNOWN_OBJ_NAME = "definitely_unknown"
 
-def write_js(tmp_path, name="demo.js", text=None):
+_GRID_SPACING = [50, 60]
+_CUSTOM_SPACING = [[10, 20]]
+_PATCH_CANVAS_X = 400
+_DEFAULT_VERTICAL_COUNT = 2
+
+
+def write_js(tmp_path: Path, name: str = "demo.js", text: str | None = None) -> Path:
+    """Write a js fixture used for linking tests."""
     path = tmp_path / name
-    path.write_text(text or "inlets = 2;\noutlets = 3;\n")
+    path.write_text(text or "inlets = 2;\noutlets = 3;\n", encoding="utf-8")
     return path
 
 
-def write_abstraction(tmp_path, name="demo.maxpat", num_inlets=1, num_outlets=1):
+def write_abstraction(
+    tmp_path: Path, name: str = "demo.maxpat", num_inlets: int = 1, num_outlets: int = 1
+) -> Path:
+    """Write a mock abstraction json file."""
     boxes = [{"box": {"maxclass": "inlet"}} for _ in range(num_inlets)] + [
         {"box": {"maxclass": "outlet"}} for _ in range(num_outlets)
     ]
     path = tmp_path / name
     path.write_text(
-        json.dumps({"patcher": {"boxes": boxes, "lines": [], "rect": [0, 0, 400, 400]}})
+        json.dumps(
+            {
+                "patcher": {
+                    "boxes": boxes,
+                    "lines": [],
+                    "rect": [0, 0, _PATCH_CANVAS_X, 400],
+                }
+            }
+        ),
+        encoding="utf-8",
     )
     return path
 
 
-def test_maxpatch_end_to_end_flow(tmp_path, monkeypatch, capsys):
+def test_maxpatch_end_to_end_flow(
+    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+) -> None:
+    """Run an end-to-end workflow touching major patch operations."""
     monkeypatch.chdir(tmp_path)
     write_js(tmp_path)
     write_abstraction(tmp_path)
@@ -62,9 +96,9 @@ def test_maxpatch_end_to_end_flow(tmp_path, monkeypatch, capsys):
     abs_obj = patch.place(
         "demo", spacing_type="custom", spacing=[[50, 60]], verbose=True
     )[0]
-    with pytest.warns(UnknownObjectWarning, match="definitely_unknown"):
+    with pytest.warns(UnknownObjectWarning, match=_UNKNOWN_OBJ_NAME):
         unknown_obj = patch.place(
-            "definitely_unknown", spacing_type="custom", spacing=[[70, 80]]
+            _UNKNOWN_OBJ_NAME, spacing_type="custom", spacing=[[70, 80]]
         )[0]
 
     patch.connect(
@@ -82,7 +116,7 @@ def test_maxpatch_end_to_end_flow(tmp_path, monkeypatch, capsys):
     patch.replace("obj-999", "message no-op", retain=False, verbose=True)
 
     replacement = patch.replace(
-        grid_objs[0]._dict["box"]["id"], "button", retain=True, verbose=True
+        grid_objs[0].__dict__["_dict"]["box"]["id"], "button", retain=True, verbose=True
     )
     assert replacement is None
     assert patch.objs["obj-1"].name == "button"
@@ -103,7 +137,7 @@ def test_maxpatch_end_to_end_flow(tmp_path, monkeypatch, capsys):
 
     output_file = tmp_path / "generated.maxpat"
     patch.save(str(output_file), verbose=False)
-    with pytest.warns(UnknownObjectWarning, match="definitely_unknown"):
+    with pytest.warns(UnknownObjectWarning, match=_UNKNOWN_OBJ_NAME):
         reloaded = MaxPatch(load_file=str(output_file), verbose=True)
     assert reloaded.num_objs == len(reloaded.objs)
     assert reloaded.get_json()["patcher"]["boxes"]
@@ -112,17 +146,18 @@ def test_maxpatch_end_to_end_flow(tmp_path, monkeypatch, capsys):
     assert reloaded.inspect("all") is None
 
     assert len(custom_objs) == 1
-    assert len(vertical_objs) == 2
-    assert len(random_objs) == 2
+    assert len(vertical_objs) == _DEFAULT_VERTICAL_COUNT
+    assert len(random_objs) == _DEFAULT_VERTICAL_COUNT
     assert js_obj.name == "js"
-    assert abs_obj._ref_file == "abstraction"
+    assert abs_obj.__dict__["_ref_file"] == "abstraction"
     assert unknown_obj.notknown() is True
 
 
-def test_maxpatch_dict_property_and_default_place_obj_position():
+def test_maxpatch_dict_property_and_default_place_obj_position() -> None:
+    """Verify dict access and default placement on new object insertion."""
     patch = MaxPatch(verbose=False)
 
     assert isinstance(patch.dict, dict)
 
     placed = patch.place_obj("toggle", verbose=False)
-    assert placed._dict["box"]["patching_rect"][:2] == [0.0, 0.0]
+    assert placed.__dict__["_dict"]["box"]["patching_rect"][:2] == [0.0, 0.0]

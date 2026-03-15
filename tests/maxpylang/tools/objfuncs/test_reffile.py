@@ -1,14 +1,19 @@
 """Tests for objfuncs.reffile helpers."""
 
 import json
+from pathlib import Path
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 
 from maxpylang import MaxObject
 from maxpylang.exceptions import UnknownObjectWarning
 
 
-def test_get_ref_checks_aliases_abstractions_and_missing_lookup(tmp_path, monkeypatch):
+def test_get_ref_checks_aliases_abstractions_and_missing_lookup(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """Verify alias, abstraction, and missing path behavior."""
     ref_root = tmp_path / "OBJ_INFO"
     package_dir = ref_root / "pkg"
     package_dir.mkdir(parents=True)
@@ -33,7 +38,8 @@ def test_get_ref_checks_aliases_abstractions_and_missing_lookup(tmp_path, monkey
         assert obj.get_ref("still_missing") == "not_found"
 
 
-def test_get_info_reads_ref_file(tmp_path):
+def test_get_info_reads_ref_file(tmp_path: Path) -> None:
+    """Verify get_info reads and returns json contents."""
     obj = MaxObject("toggle")
     info = {"args": {}, "attribs": [], "in/out": {}, "default": {}}
     ref_file = tmp_path / "widget.json"
