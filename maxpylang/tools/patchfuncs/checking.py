@@ -26,7 +26,6 @@ def check(self: Any, *flags: str) -> None:
     identified by object id, name, text, and linked file (if applicable).
     :rtype: printed output
     """
-
     flag_list = list(flags)
 
     if len(flag_list) == 0 or "all" in flag_list:
@@ -98,14 +97,11 @@ def check(self: Any, *flags: str) -> None:
             )
         print()
 
-    return
-
 
 def get_unknowns(self: Any) -> dict[str, Any]:
     """
     Get a list of unknown objects in the patch.
     """
-
     unknowns: dict[str, Any] = {}
 
     for label, obj in self._objs.items():
@@ -119,7 +115,6 @@ def get_abstractions(self: Any) -> dict[str, Any]:
     """
     Get a list of abstractions in the patch.
     """
-
     abstractions: dict[str, Any] = {}
 
     for label, obj in self._objs.items():
@@ -133,7 +128,6 @@ def get_js_objs(self: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Get a list of js files in the patch.
     """
-
     linked: dict[str, Any] = {}
     unlinked: dict[str, Any] = {}
 

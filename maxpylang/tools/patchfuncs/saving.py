@@ -28,7 +28,6 @@ def save(
     verbose --> print log message to console
     check --> run check_patch before saving
     """
-
     # check proper extension
     if ".maxpat" not in Path(filename).suffixes:
         filename += ".maxpat"
@@ -53,8 +52,6 @@ def save(
     if verbose:
         print("maxpatch saved to", filename)
 
-    return
-
 
 def get_json(self: Any) -> dict[str, Any]:
     """
@@ -62,9 +59,8 @@ def get_json(self: Any) -> dict[str, Any]:
 
     Returns patcher dict with objects and patchcords added.
     """
-
     # copy patcher_dict, for inserting objs and cords
-    json_dict = cast(dict[str, Any], copy.deepcopy(self._patcher_dict))
+    json_dict = cast("dict[str, Any]", copy.deepcopy(self._patcher_dict))
 
     # for each obj...
     for id, obj in self._objs.items():

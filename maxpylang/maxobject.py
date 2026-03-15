@@ -65,7 +65,6 @@ class MaxObject:
             inlets --> number of inlets (default 0)
             outlets --> number of outlets (default 0)
         """
-
         self._ref_file: Optional[str] = None
         self._dict: dict[str, Any] = {}
         self._name: str = ""
@@ -211,7 +210,7 @@ class MaxObject:
     ) -> dict[str, Any]:
         return _attribs.remove_bad_attribs(self, attribs, attrib_speclist)
 
-    def retain_attribs(self, other: "MaxObject") -> None:
+    def retain_attribs(self, other: MaxObject) -> None:
         _attribs.retain_attribs(self, other)
 
     def get_extra_attribs(self) -> dict[str, Any]:

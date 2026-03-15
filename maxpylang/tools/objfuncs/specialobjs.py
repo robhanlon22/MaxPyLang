@@ -14,10 +14,10 @@ Methods to handle special objects.
 
 from __future__ import annotations
 
-from pathlib import Path
-import os
-import json
 import copy
+import json
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from maxpylang.tools import typechecks as tc
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
-def create_js(self: "MaxObject", from_dict: bool | None = None) -> None:
+def create_js(self: MaxObject, from_dict: bool | None = None) -> None:
     """
     Special-case: update for js objects.
 
@@ -53,17 +53,15 @@ def create_js(self: "MaxObject", from_dict: bool | None = None) -> None:
 
 
     """
-
     # 1. get filename
     if not from_dict:  # get filename from args
         filename = self.get_js_filename()
         if filename is None:
             print("ObjectWarning: js : creation : no filename specified")
             return
-        else:
-            self._dict["box"]["saved_object_attributes"]["filename"] = (
-                filename  # save to dict
-            )
+        self._dict["box"]["saved_object_attributes"]["filename"] = (
+            filename  # save to dict
+        )
 
     # if from dict, get filename from dict
     else:
@@ -101,12 +99,11 @@ def create_js(self: "MaxObject", from_dict: bool | None = None) -> None:
 
 
 def update_js_from_file(
-    self: "MaxObject", filename: str, log_var: str | None = None
+    self: MaxObject, filename: str, log_var: str | None = None
 ) -> None:
     """
     References external .js file to update js object inlets, outlets, args, and text.
     """
-
     # ASSUME INLET/OUTLET NUMBERS SET ONLY ONCE IN JS FILE.......
     # get inlet/outlet numbers
     numinlets, numoutlets = self.get_js_io(filename, log_var=log_var)
@@ -129,17 +126,14 @@ def update_js_from_file(
         filename,
     )
 
-    return
-
 
 def get_js_io(
-    self: "MaxObject", filename: str, log_var: str | None = None
+    self: MaxObject, filename: str, log_var: str | None = None
 ) -> tuple[Union[str, int], Union[str, int]]:
     """
     Get the number of ins and outs from an external js file.
     """
-
-    with open(filename, "r") as f:
+    with open(filename) as f:
         lines = f.readlines()
         numinlets: Union[str, int, None] = None
         numoutlets: Union[str, int, None] = None
@@ -172,12 +166,11 @@ def get_js_io(
     return numinlets, numoutlets
 
 
-def get_js_filename(self: "MaxObject") -> str | None:
+def get_js_filename(self: MaxObject) -> str | None:
     """
     Gets the js filename from js args.
     Returns None if no filename in args.
     """
-
     try:
         filename = str(
             [x for x in self._args if not tc.check_number(x)][0]
@@ -191,14 +184,13 @@ def get_js_filename(self: "MaxObject") -> str | None:
     return filename
 
 
-def link_js(self: "MaxObject", link_file: str | None = None) -> None:
+def link_js(self: MaxObject, link_file: str | None = None) -> None:
     """
     Helper function for linking.
 
     Links a js object to external .js file, and updates js object args/text to match.
     If no file given, try to link to its current filename.
     """
-
     # if no file given, get it from js object
     if link_file is None:
         link_file = self._dict["box"]["saved_object_attributes"]["filename"]
@@ -228,7 +220,7 @@ def link_js(self: "MaxObject", link_file: str | None = None) -> None:
 
 
 def create_abstraction(
-    self: "MaxObject",
+    self: MaxObject,
     text: str | None = None,
     extra_attribs: dict[str, Any] | None = None,
     from_dict: bool = True,
@@ -240,7 +232,6 @@ def create_abstraction(
     *abstractions will only have common box attribs available
     *also apparently Max will take those fine lmao so whatever
     """
-
     # name, args, text_attribs, ref_file all inputted already
     # if from_dict, also dict filled
     # missing: (dict), ins/outs, ext_file
@@ -265,11 +256,9 @@ def create_abstraction(
             "file found, abstraction created",
         )
 
-    return
-
 
 def update_abstraction_from_file(
-    self: "MaxObject",
+    self: MaxObject,
     text: str | None,
     extra_attribs: dict[str, Any] | None,
     log_var: str | None = None,
@@ -277,7 +266,6 @@ def update_abstraction_from_file(
     """
     Update abstraction dictionary, extra attribs, and xlets from external file.
     """
-
     # parse ext_file to get inlets/outlet numbers
     numinlets, numoutlets = self.get_abstraction_io()
     extra_attribs = extra_attribs or {}
@@ -314,11 +302,9 @@ def update_abstraction_from_file(
         "file found, abstraction created",
     )
 
-    return
-
 
 def create_declared_abstraction(
-    self: "MaxObject",
+    self: MaxObject,
     text: str,
     numinlets: int,
     numoutlets: int,
@@ -330,7 +316,6 @@ def create_declared_abstraction(
     Used when abstraction=True is passed to MaxObject, allowing users to declare
     abstractions that don't exist in the current working directory.
     """
-
     # fill in ext_file
     self._ext_file = self.name
     if ".maxpat" not in self.name:
@@ -356,20 +341,17 @@ def create_declared_abstraction(
     # create ins/outs from dict
     self.make_xlets_from_self_dict()
 
-    return
 
-
-def get_abstraction_io(self: "MaxObject") -> tuple[int, int]:
+def get_abstraction_io(self: MaxObject) -> tuple[int, int]:
     """
     Returns the number of inlets and outlets in an abstraction file.
     """
-
     numinlets = 0
     numoutlets = 0
 
     # read file, get list of objects
     assert self._ext_file is not None
-    with open(self._ext_file, "r") as f:
+    with open(self._ext_file) as f:
         boxes = json.loads(f.read())["patcher"]["boxes"]
 
     # look for inlets/outlets
@@ -382,7 +364,7 @@ def get_abstraction_io(self: "MaxObject") -> tuple[int, int]:
     return numinlets, numoutlets
 
 
-def link_abstraction(self: "MaxObject", link_file: str | None = None) -> None:
+def link_abstraction(self: MaxObject, link_file: str | None = None) -> None:
     """
     Helper function for linking.
 
@@ -390,7 +372,6 @@ def link_abstraction(self: "MaxObject", link_file: str | None = None) -> None:
     Updates object name to match given file, and updates object ins/outs to match external file.
     If no file given, try to link to [name].maxpat file.
     """
-
     # if file not given, use object name
     if link_file is None:
         link_file = self.name
@@ -421,10 +402,8 @@ def link_abstraction(self: "MaxObject", link_file: str | None = None) -> None:
             "not found in current directory, file not linked",
         )
 
-    return
 
-
-def get_trigger_out_types(self: "MaxObject") -> list[str]:
+def get_trigger_out_types(self: MaxObject) -> list[str]:
     """
     Special-case: getting trigger outlet types.
     """
@@ -443,7 +422,7 @@ def get_trigger_out_types(self: "MaxObject") -> list[str]:
     return types
 
 
-def get_unpack_out_types(self: "MaxObject") -> list[str]:
+def get_unpack_out_types(self: MaxObject) -> list[str]:
     """
     Special-case: getting unpack outlet types.
     """
@@ -458,13 +437,10 @@ def get_unpack_out_types(self: "MaxObject") -> list[str]:
     return types
 
 
-def update_vst(self: "MaxObject") -> None:
+def update_vst(self: MaxObject) -> None:
     """
     Special-case: dict update from args.
     """
-
     self._dict["box"]["save"].remove(";")
     self._dict["box"]["save"] += self._args
     self._dict["box"]["save"].append(";")
-
-    return

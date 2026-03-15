@@ -16,11 +16,10 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
-def notknown(self: "MaxObject") -> bool:
+def notknown(self: MaxObject) -> bool:
     """
     Return true if the object has no ref_file.
     """
-
     return self._ref_file is None
 
 
@@ -31,7 +30,7 @@ def notknown(self: "MaxObject") -> bool:
 # return self.notknown()
 
 
-def __repr__(self: "MaxObject") -> str:
+def __repr__(self: MaxObject) -> str:
 
     rep = self.name + " ["
     if "text" in self._dict["box"].keys():

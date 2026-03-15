@@ -2,7 +2,8 @@
 Methods for checking datatypes.
 """
 
-from typing import Any, Callable, Sequence
+from collections.abc import Sequence
+from typing import Any, Callable
 
 
 def check_number(arg: Any) -> bool:

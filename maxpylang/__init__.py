@@ -189,9 +189,10 @@ from .importobjs import import_objs as import_objs
 from .maxobject import MaxObject as MaxObject
 from .maxpatch import MaxPatch as MaxPatch
 from .tools import constants as constants
-from .xlet import Inlet as Inlet, Outlet as Outlet
+from .xlet import Inlet as Inlet
+from .xlet import Outlet as Outlet
 
-__all__ = ["constants", "Inlet", "MaxObject", "MaxPatch", "Outlet", "import_objs"]
+__all__ = ["Inlet", "MaxObject", "MaxPatch", "Outlet", "constants", "import_objs"]
 
 
 def __getattr__(name: str) -> Any:

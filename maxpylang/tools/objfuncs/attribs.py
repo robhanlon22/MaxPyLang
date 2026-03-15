@@ -22,18 +22,16 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
-def add_extra_attribs(self: "MaxObject", extra_attribs: dict[str, Any]) -> None:
+def add_extra_attribs(self: MaxObject, extra_attribs: dict[str, Any]) -> None:
     """
     Add extra attributes to self dict.
     """
     for key, val in extra_attribs.items():
         self._dict["box"][key] = val
 
-    return
-
 
 def get_all_valid_attribs(
-    self: "MaxObject",
+    self: MaxObject,
     text_attribs: dict[str, Any],
     extra_attribs: dict[str, Any],
     attrib_info: list[dict[str, Any]],
@@ -45,7 +43,6 @@ def get_all_valid_attribs(
 
     *As a general rule, text attributes can only access object-specific attributes.
     """
-
     # first, check text attribs
     text_attribs = self.remove_bad_attribs(text_attribs, attrib_info)
 
@@ -63,7 +60,7 @@ def get_all_valid_attribs(
 
 
 def remove_bad_attribs(
-    self: "MaxObject",
+    self: MaxObject,
     attribs: dict[str, Any],
     attrib_speclist: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -72,7 +69,6 @@ def remove_bad_attribs(
 
     Checks attributes against attribute info and removes nonvalid attributes.
     """
-
     notvalid: list[str] = []
     for attrib, vals in attribs.items():
         # make it a list...
@@ -134,27 +130,23 @@ def remove_bad_attribs(
     return attribs
 
 
-def retain_attribs(self: "MaxObject", other: Any) -> None:
+def retain_attribs(self: MaxObject, other: Any) -> None:
     """
     Retain overlapping extra attributes from another MaxObject.
 
     Used in MaxPatch for replacement.
     """
-
     # get non-normal extra attribs from other obj
     extra_attribs = other.get_extra_attribs()
 
     # add to obj
     self.edit(**extra_attribs)
 
-    return
 
-
-def get_extra_attribs(self: "MaxObject") -> dict[str, Any]:
+def get_extra_attribs(self: MaxObject) -> dict[str, Any]:
     """
     Get an object's extra attributes from its dictionary.
     """
-
     normal = [
         "id",
         "maxclass",

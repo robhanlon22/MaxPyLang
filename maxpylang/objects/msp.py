@@ -2,6 +2,7 @@
 
 import os as _os
 import sys as _sys
+
 from maxpylang.maxobject import MaxObject
 
 __all__ = [

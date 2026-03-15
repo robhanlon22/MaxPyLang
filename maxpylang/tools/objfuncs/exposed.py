@@ -17,19 +17,16 @@ if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
-def move(self: "MaxObject", x: float | int, y: float | int) -> None:
+def move(self: MaxObject, x: float, y: float) -> None:
     """
     Move an object to the specified location.
     """
-
     self._dict["box"]["patching_rect"][0] = x
     self._dict["box"]["patching_rect"][1] = y
 
-    return
-
 
 def edit(
-    self: "MaxObject",
+    self: MaxObject,
     text_add: str = "append",
     text: str | None = None,
     **extra_attribs: Any,
@@ -43,7 +40,6 @@ def edit(
     Should not use this function to change object class (i.e. name)!!!
     Can only change args/text attributes/extra attributes
     """
-
     # only edit if it's not an unknown object
     if self.notknown():
         print("Error: attempting edit on empty object")
@@ -84,8 +80,8 @@ def edit(
             self.name,
             ": edit :",
             "abstraction edited naively. if abstraction args "
-            + "affect inlets/outlets or abstraction has unique attributes, abstraction info must be imported "
-            + "using import_objs() function to reflect arg/attribute behaviors.",
+            "affect inlets/outlets or abstraction has unique attributes, abstraction info must be imported "
+            "using import_objs() function to reflect arg/attribute behaviors.",
         )
         return
 
@@ -113,7 +109,7 @@ def edit(
     return
 
 
-def link(self: "MaxObject", link_file: str | None = None) -> None:
+def link(self: MaxObject, link_file: str | None = None) -> None:
     """
     Link a file for a js object or abstraction.
 
@@ -123,7 +119,6 @@ def link(self: "MaxObject", link_file: str | None = None) -> None:
 
     For js objects, linking or re-linking will automatically update the text field to reflect the proper filename.
     """
-
     # check for js file or abstraction or unknown (only three cases allowed)
     if not (
         self.name == "js" or self._ref_file is None or self._ref_file == "abstraction"
@@ -142,9 +137,8 @@ def link(self: "MaxObject", link_file: str | None = None) -> None:
     return
 
 
-def inspect(self: "MaxObject") -> None:
+def inspect(self: MaxObject) -> None:
     """
     Print out specified information about the object.
     """
-
     return

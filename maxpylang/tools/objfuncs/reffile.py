@@ -11,8 +11,8 @@ Methods that deal with the MaxObject's reference file.
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 from maxpylang.exceptions import UnknownObjectWarning
 
 
-def get_ref(self: "MaxObject", name: str) -> str:
+def get_ref(self: MaxObject, name: str) -> str:
     """
     Helper function for instantiation.
 
@@ -30,7 +30,6 @@ def get_ref(self: "MaxObject", name: str) -> str:
     If it doesn't exist, look for an abstraction file.
     If no abstraction file, print error and return "not_found"
     """
-
     # check aliases for symbol objs and special objs
     name = self.check_aliases(name)
 
@@ -60,14 +59,13 @@ def get_ref(self: "MaxObject", name: str) -> str:
     return ref_file
 
 
-def check_aliases(self: "MaxObject", name: str) -> str:
+def check_aliases(self: MaxObject, name: str) -> str:
     """
     Check name against aliases and return aliased object name, if applicable.
     """
-
     aliases_file = os.path.join(self.obj_info_folder, "obj_aliases.json")
 
-    with open(aliases_file, "r") as f:
+    with open(aliases_file) as f:
         obj_aliases = json.loads(f.read())
 
     if name in obj_aliases.keys():
@@ -76,7 +74,7 @@ def check_aliases(self: "MaxObject", name: str) -> str:
     return name
 
 
-def get_info(self: "MaxObject", ref_file: str | None = None) -> dict[str, Any]:
+def get_info(self: MaxObject, ref_file: str | None = None) -> dict[str, Any]:
     """
     Helper function.
 
@@ -86,7 +84,7 @@ def get_info(self: "MaxObject", ref_file: str | None = None) -> dict[str, Any]:
         ref_file = self._ref_file
     assert ref_file is not None
     # read ref file
-    with open(ref_file, "r") as f:
+    with open(ref_file) as f:
         info: dict[str, Any] = json.loads(f.read())
 
     return info

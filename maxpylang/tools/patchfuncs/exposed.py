@@ -17,7 +17,7 @@ Functions of MaxPatch that are exposed to the user.
 
 """
 
-from typing import Any, Union
+from typing import Any
 
 
 # reorder objects
@@ -25,7 +25,6 @@ def reorder(self: Any, verbose: bool = False) -> None:
     """
     Re-number objects in patch, starting from 1.
     """
-
     if verbose:
         print("reordering", self.num_objs, "objects...")
 
@@ -47,13 +46,11 @@ def reorder(self: Any, verbose: bool = False) -> None:
     if verbose:
         print(self.num_objs, "objects reordered")
 
-    return
-
 
 def set_position(
     self: Any,
-    new_x: Union[float, int],
-    new_y: Union[float, int],
+    new_x: float,
+    new_y: float,
     from_place: bool = False,
     verbose: bool = False,
 ) -> None:
@@ -62,7 +59,6 @@ def set_position(
 
     Must be formatted as [x, y] tuple or int of length 2.
     """
-
     # check format
     if isinstance(new_x, (float, int)) and isinstance(new_y, (float, int)):
         self._curr_position = [new_x, new_y]
@@ -72,15 +68,12 @@ def set_position(
             else:
                 print("position set to", self._curr_position)
 
+    elif from_place:
+        print(
+            "Error: starting position must be specified as int or float, starting position not set"
+        )
     else:
-        if from_place:
-            print(
-                "Error: starting position must be specified as int or float, starting position not set"
-            )
-        else:
-            print("Error: position must be specified as int or float, position not set")
-
-    return
+        print("Error: position must be specified as int or float, position not set")
 
 
 # replace objects
@@ -106,7 +99,6 @@ def replace(
     verbose --> log to console
     new_attribs --> any new attributes to give to the new object
     """
-
     # check current obj exists
     if curr_obj_num not in self._objs.keys():
         print(curr_obj_num, "does not exist, nothing changed")
@@ -161,7 +153,6 @@ def inspect(self: Any, *objs: str, info: str = "all") -> None:
            - "position": print position on canvas
 
     """
-
     # probably just call the MaxObject info() function
 
     return

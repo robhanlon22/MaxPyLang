@@ -21,7 +21,6 @@ from typing import Any
 
 from maxpylang.xlet import Inlet, Outlet
 
-
 Connection = list[Any]
 
 
@@ -39,7 +38,6 @@ def connect(self: Any, *connections: Connection, verbose: bool = True) -> None:
 
     :returns: None
     """
-
     # check correct format, remove incorrectly typed connections
     self.check_connection_format(connections)
     connections = self.check_connection_typing(connections)
@@ -69,8 +67,6 @@ def connect(self: Any, *connections: Connection, verbose: bool = True) -> None:
                 ")",
             )
 
-    return
-
 
 def swap_patchcords(self: Any, new: Any, old: Any) -> None:
     """
@@ -78,7 +74,6 @@ def swap_patchcords(self: Any, new: Any, old: Any) -> None:
 
     Swaps all possible patchcords from the old object to new object.
     """
-
     new_connections: list[Connection] = []
     old_connections: list[Connection] = []
 
@@ -109,8 +104,6 @@ def swap_patchcords(self: Any, new: Any, old: Any) -> None:
     # connect new connections
     self.connect(*new_connections)
 
-    return
-
 
 def check_connection_format(
     self: Any, connections: tuple[Connection, ...] | list[Connection]
@@ -120,7 +113,6 @@ def check_connection_format(
 
     Checks proper formatting for connection specifications.
     """
-
     for connection in connections:
         assert (
             isinstance(connection[0], Outlet)
@@ -131,8 +123,6 @@ def check_connection_format(
             assert isinstance(connection[2], list), (
                 "optional midpoints must be specified as list"
             )
-
-    return
 
 
 def check_connection_typing(
@@ -156,7 +146,6 @@ def check_connection_exists(
 
     Removes nonexistent connections from list and returns updated list.
     """
-
     existing_connections: list[Connection] = []
 
     for connection in connections:

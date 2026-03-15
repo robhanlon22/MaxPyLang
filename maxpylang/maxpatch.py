@@ -4,9 +4,8 @@ Class representing a MaxPatch.
 
 from __future__ import annotations
 
-from typing import Any, cast
-
 import os
+from typing import Any, cast
 
 from .maxobject import MaxObject
 from .tools import constants as _constants
@@ -57,7 +56,6 @@ class MaxPatch:
         """
         Constructor method.
         """
-
         self._objs: ObjectDict = {}
         self._num_objs = 0
         self._patcher_dict: JSONDict = {}
@@ -299,13 +297,13 @@ class MaxPatch:
         _checking.check(self, *flags)
 
     def get_unknowns(self) -> ObjectDict:
-        return cast(ObjectDict, _checking.get_unknowns(self))
+        return cast("ObjectDict", _checking.get_unknowns(self))
 
     def get_abstractions(self) -> ObjectDict:
-        return cast(ObjectDict, _checking.get_abstractions(self))
+        return cast("ObjectDict", _checking.get_abstractions(self))
 
     def get_js_objs(self) -> tuple[ObjectDict, ObjectDict]:
-        return cast(tuple[ObjectDict, ObjectDict], _checking.get_js_objs(self))
+        return cast("tuple[ObjectDict, ObjectDict]", _checking.get_js_objs(self))
 
     def add_barebones_obj(self, obj_text: str) -> None:
         _misc.add_barebones_obj(self, obj_text)

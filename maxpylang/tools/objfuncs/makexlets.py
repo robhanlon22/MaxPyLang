@@ -25,20 +25,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from maxpylang.xlet import Inlet, Outlet
 from maxpylang.tools import typechecks as tc
+from maxpylang.xlet import Inlet, Outlet
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
-def make_xlets_from_self_dict(self: "MaxObject") -> None:
+def make_xlets_from_self_dict(self: MaxObject) -> None:
     """
     Helper function for instantiation.
 
     Makes inlets and outlets based on information in self._dict.
     """
-
     # make inlets
     # ******WOULD DO SOME INLET TYPING STUFF HERE......[TYPING NEEDED]
     self._ins = [Inlet(self, index) for index in range(self._dict["box"]["numinlets"])]
@@ -61,14 +60,12 @@ def make_xlets_from_self_dict(self: "MaxObject") -> None:
         for index, x in zip(range(self._dict["box"]["numoutlets"]), out_types)
     ]
 
-    return
-
 
 # *************** UPDATE/ADD/REMOVE XLETS ***********************
 
 
 def update_ins_outs(
-    self: "MaxObject", inout_info: dict[str, Any], default_info: dict[str, Any]
+    self: MaxObject, inout_info: dict[str, Any], default_info: dict[str, Any]
 ) -> None:
     """
     Helper function for instantiation and editing.
@@ -76,7 +73,6 @@ def update_ins_outs(
     Adds or removes inlets and outlets according to text arguments and in/out info.
     if removed xlets had connections, those connections are also removed.
     """
-
     # if no text args or no changes possible, do nothing
     del default_info
     if self._args == [] or inout_info == {}:
@@ -90,7 +86,7 @@ def update_ins_outs(
         else:
             self_xlets = self._outs
         # if there's updates
-        if xlet_type in inout_info.keys():
+        if xlet_type in inout_info:
             curr_xlets = len(self_xlets)
             new_xlets = self.parse_io_num(
                 inout_info[xlet_type], curr_xlets
@@ -120,9 +116,7 @@ def update_ins_outs(
     return
 
 
-def parse_io_num(
-    self: "MaxObject", info: list[dict[str, Any]], default_num: int
-) -> int:
+def parse_io_num(self: MaxObject, info: list[dict[str, Any]], default_num: int) -> int:
     """
     Helper function for updating ins and outs.
 
@@ -169,29 +163,25 @@ def parse_io_num(
     return total
 
 
-def add_xlets(self: "MaxObject", num: int, xlet_type: str) -> None:
+def add_xlets(self: MaxObject, num: int, xlet_type: str) -> None:
     """
     Helper function for updating ins and outs.
 
     Adds the given number of xlets. (does not update typing!)
     """
-
     if xlet_type == "numinlets":
         self._ins += [Inlet(self, len(self._ins) + i) for i in range(num)]
 
     elif xlet_type == "numoutlets":
         self._outs += [Outlet(self, len(self._outs) + i) for i in range(num)]
 
-    return
 
-
-def remove_xlets(self: "MaxObject", num: int, xlet_type: str) -> None:
+def remove_xlets(self: MaxObject, num: int, xlet_type: str) -> None:
     """
     Helper function for updating ins and outs.
 
     Removes the given number of xlets and any attached patchcords. (does not update typing!)
     """
-
     if xlet_type == "numinlets":
         removed_inlets = self._ins[-num:]
         del self._ins[-num:]  # remove inlets from object
@@ -211,34 +201,28 @@ def remove_xlets(self: "MaxObject", num: int, xlet_type: str) -> None:
                 inlet._sources.remove(outlet)
                 print("Patchcord removed:", outlet_desc, "-/->", inlet_desc)
 
-    return
 
-
-def update_dict_io_nums(self: "MaxObject") -> None:
+def update_dict_io_nums(self: MaxObject) -> None:
     """
     Helper function for updating ins and outs.
 
     Updates the numinlets/numoutlets entries in self._dict, according to self._ins and self._outs.
     """
-
     self._dict["box"]["numinlets"] = len(self._ins)
     self._dict["box"]["numoutlets"] = len(self._outs)
-
-    return
 
 
 # ******************* XLET TYPING ************************
 
 
 def update_xlet_typing(
-    self: "MaxObject", info: dict[str, Any], xlet_type: str, num_xlets: int
+    self: MaxObject, info: dict[str, Any], xlet_type: str, num_xlets: int
 ) -> None:
     """
     Helper function for updating ins and outs.
 
     Fills in typing info for inlets and outlets.
     """
-
     # get typing info from info dict
     type_info = info[xlet_type][0]["type"]
 
@@ -257,16 +241,13 @@ def update_xlet_typing(
         elif xlet_type == "numoutlets":
             self._outs[i]._types = new_types[i]
 
-    return
 
-
-def parse_io_typing(self: "MaxObject", type_info: Any, num_xlets: int) -> list[Any]:
+def parse_io_typing(self: MaxObject, type_info: Any, num_xlets: int) -> list[Any]:
     """
     Helper function for updating xlet typing.
 
     Returns list of xlet types.
     """
-
     # when type_info is just one string...
     new_types: list[Any]
     if isinstance(type_info, str) or type_info is None:

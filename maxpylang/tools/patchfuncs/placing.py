@@ -21,11 +21,12 @@ Methods related to placing objects in a MaxPatch.
 from __future__ import annotations
 
 import random
-from typing import Any, List, Optional, Sequence, Tuple, Union, cast
+from collections.abc import Sequence
+from typing import Any, List, Optional, Tuple, Union, cast
 
 import numpy as np
-from maxpylang.maxobject import MaxObject
 
+from maxpylang.maxobject import MaxObject
 
 ObjectSpec = Union[str, MaxObject, List[Any]]
 ObjectSequence = Sequence[ObjectSpec]
@@ -76,10 +77,9 @@ def place(
     :returns: a list of the MaxObjects that have been created
 
     """
-
     # check arguments are correct
     num_objs, starting_pos = cast(
-        Tuple[CountSpec, Optional[Position]],
+        "Tuple[CountSpec, Optional[Position]]",
         self.place_check_args(
             objs, randpick, num_objs, seed, weights, spacing_type, spacing, starting_pos
         ),
@@ -93,29 +93,30 @@ def place(
 
     # generate total list of objects to be placed
     picked_objs = cast(
-        list[ObjectSpec],
+        "list[ObjectSpec]",
         self.place_pick_objs(objs, randpick, num_objs, seed, weights, verbose),
     )
 
     # place objects according to spacing
     if spacing_type == "grid":
         placed_objs = cast(
-            list[MaxObject], self.place_grid(picked_objs, spacing, verbose=verbose)
+            "list[MaxObject]", self.place_grid(picked_objs, spacing, verbose=verbose)
         )
     elif spacing_type == "custom":
         placed_objs = cast(
-            list[MaxObject], self.place_custom(picked_objs, spacing, verbose=verbose)
+            "list[MaxObject]", self.place_custom(picked_objs, spacing, verbose=verbose)
         )
     elif spacing_type == "random":
         if seed is None:  # generate seed if not given
             seed = random.randrange(2**32 - 1)
         placed_objs = cast(
-            list[MaxObject], self.place_random(picked_objs, seed, verbose=verbose)
+            "list[MaxObject]", self.place_random(picked_objs, seed, verbose=verbose)
         )
     else:
         assert spacing_type == "vertical"
         placed_objs = cast(
-            list[MaxObject], self.place_vertical(picked_objs, spacing, verbose=verbose)
+            "list[MaxObject]",
+            self.place_vertical(picked_objs, spacing, verbose=verbose),
         )
 
     return placed_objs
@@ -139,7 +140,6 @@ def place_check_args(
     Check that all arguments are formatted correctly.
     Format num_objs correctly.
     """
-
     # check objs
     for obj in objs:
         assert isinstance(obj, (MaxObject, str, list)), (
@@ -237,7 +237,6 @@ def place_pick_objs(
 
     Returns list of picked objects to place, either picked randomly or multiplied from given list.
     """
-
     del self
     picked_objs: list[ObjectSpec] = []
 
@@ -276,7 +275,6 @@ def place_grid(
     Helper function for placing.
     Places objects in a grid.
     """
-
     if verbose:
         print("Patcher: placing", len(objs), "objects with grid spacings of", spacing)
 
@@ -316,7 +314,6 @@ def place_random(
     Helper function for placing.
     Places objects randomly.
     """
-
     if verbose:
         print("Patcher: placing", len(objs), "objects randomly with seed", seed)  # log
 
@@ -343,7 +340,6 @@ def place_custom(
     Helper function for placing.
     Places objects according to custom positions.
     """
-
     if verbose:
         print(
             "Patcher: placing", len(objs), "objects with custom positions of", positions
@@ -362,13 +358,12 @@ def place_custom(
 
 # spacing
 def place_vertical(
-    self: Any, objs: ObjectSequence, spacing: Union[float, int], verbose: bool = False
+    self: Any, objs: ObjectSequence, spacing: float, verbose: bool = False
 ) -> list[MaxObject]:
     """
     Helper function for placing.
     Places objects vertically.
     """
-
     if verbose:
         print(
             "Patcher: placing", len(objs), "objects with vertical spacing of", spacing
@@ -405,8 +400,7 @@ def place_obj(
     verbose --> debug commands
     replace_id --> 'obj-num' string of object being replaced
     """
-
-    obj = cast(MaxObject, self.get_obj_from_spec(obj))
+    obj = cast("MaxObject", self.get_obj_from_spec(obj))
 
     if replace_id is None:  # for just adding (not replacing)...
         self._num_objs += 1  # increment patch number of objects
@@ -419,7 +413,7 @@ def place_obj(
     obj._dict["box"]["patching_rect"][0:2] = position  # change position
 
     # add to various dictionaries of patch objects by obj-id
-    obj_id = cast(str, obj._dict["box"]["id"])
+    obj_id = cast("str", obj._dict["box"]["id"])
     self._objs[obj_id] = obj
 
     if verbose:
@@ -436,7 +430,6 @@ def get_obj_from_spec(self: Any, obj_spec: ObjectSpec) -> MaxObject:
     """
     Helper function to get object from specification, either from string or from MaxObject.
     """
-
     # if given as string, make object (warning fires from MaxObject constructor)
     if isinstance(obj_spec, str):
         obj: MaxObject = MaxObject(obj_spec)

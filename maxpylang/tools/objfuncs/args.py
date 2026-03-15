@@ -9,20 +9,22 @@ Methods dealing with text args for MaxObjects.
 """
 
 from __future__ import annotations
+
 import warnings
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Union
 
-from typing import TYPE_CHECKING, Any, Sequence, Union
-
-from maxpylang.tools import typechecks as tc
-from maxpylang.exceptions import UnknownObjectWarning
 import tabulate  # type: ignore[import-untyped]
+
+from maxpylang.exceptions import UnknownObjectWarning
+from maxpylang.tools import typechecks as tc
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 
 def args_valid(
-    self: "MaxObject",
+    self: MaxObject,
     name: str,
     args: Sequence[Union[str, int, float]],
     arg_info: dict[str, list[dict[str, Any]]],
@@ -30,7 +32,6 @@ def args_valid(
     """
     Function to check text arguments against argument info.
     """
-
     # get required, optional arguments
     args_req = arg_info["required"]
     args_opt = arg_info["optional"]
@@ -97,7 +98,7 @@ def args_valid(
 
 
 def get_typed_args(
-    self: "MaxObject", args: Sequence[str]
+    self: MaxObject, args: Sequence[str]
 ) -> list[Union[str, int, float]]:
     """
     Turn string args into floats or ints.

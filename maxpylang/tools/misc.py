@@ -13,7 +13,6 @@ def get_objs() -> dict[str, list[str]]:
     """
     Fetches lists of all available (templated) objects, sorted into a dictionary by package.
     """
-
     # get all templated packages
     packages = glob.glob(os.path.join(obj_info_folder, "*/"))
 

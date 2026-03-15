@@ -3,6 +3,7 @@
 # ruff: noqa: F403
 
 import warnings
+
 from maxpylang.exceptions import UnknownObjectWarning
 
 # Stubs intentionally create objects without args; suppress warnings during import

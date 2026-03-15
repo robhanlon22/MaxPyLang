@@ -1,6 +1,6 @@
-import maxpylang as mp
 import sys
 
+import maxpylang as mp
 
 row_coords = [8, 7, 6, 5, 4, 3, 2, 1]
 column_coords = ["a", "b", "c", "d", "e", "f", "g", "h"]
@@ -89,7 +89,7 @@ def main() -> int:
 
     # first, read file with FEN strings into a list of split FEN strings
     fen_strings = []
-    with open("fens.txt", "r") as fenfile:
+    with open("fens.txt") as fenfile:
         lines = fenfile.read().splitlines()
         for line in lines:
             split_line = line.split("/")

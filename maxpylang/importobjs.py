@@ -1,28 +1,27 @@
 from __future__ import annotations
 
-import os
-import json
-import glob
 import builtins
+import collections
+import glob
+import json
 import keyword
-from pathlib import Path
+import os
 import shutil
 import subprocess
 import time
 import xml.etree.ElementTree as ET
-import collections
+from pathlib import Path
 from typing import Any
 
+from .maxpatch import MaxPatch
 
 # import some constants...
-from .tools.constants import get_constant
-from .tools.constants import obj_info_folder  # path to maxpy obj info folder
-from .tools.constants import obj_io_folder  # path to obj io folder
 from .tools.constants import (
+    get_constant,
     import_tools,
+    obj_info_folder,  # path to maxpy obj info folder
+    obj_io_folder,  # path to obj io folder
 )  # maxpatch json to add open/close functionality
-
-from .maxpatch import MaxPatch
 
 # other constants
 common_box_standin = [{"name": "COMMON"}]  # for attributes
@@ -57,7 +56,6 @@ def import_objs(*packages: str, overwrite: bool = False) -> None:
     Make sure the Max application is OPEN when running this command!
     If import fails, set wait_time higher and re-import.
     """
-
     # create obj_info_folder to hold ref_files
     if not os.path.exists(obj_info_folder):
         os.mkdir(obj_info_folder)
@@ -73,8 +71,6 @@ def import_objs(*packages: str, overwrite: bool = False) -> None:
 
     # generate Python stub modules for imported objects
     generate_stubs(package_paths, package_info_folders)
-
-    return
 
 
 #############################################################################################
@@ -122,7 +118,6 @@ def prep_make_info_folders(
 
     Checks for package existance, deletes old folder if overwriting, makes new folder if new import.
     """
-
     package_info_folders: PackagePaths = {}
     for package, package_path in package_paths.items():
         # check to see if package exists
@@ -175,7 +170,6 @@ def save_obj_info(
     Saves default, argument, attribute, and inlet/outlet info for each object in the specified packages.
     Also saves obj aliases into obj_aliases.json file.
     """
-
     obj_aliases = known_aliases
 
     # store object info, by package
@@ -245,8 +239,6 @@ def save_obj_info(
         json.dump(obj_aliases, f, indent=2)
     print("object aliases saved successfully")
 
-    return
-
 
 def is_unlisted(ref: str) -> bool:
     """
@@ -255,7 +247,6 @@ def is_unlisted(ref: str) -> bool:
 
     ref --> Max reference file of the object
     """
-
     xmltree = ET.parse(ref)
     root = xmltree.getroot()
     if "category" in root.attrib.keys():
@@ -274,7 +265,6 @@ def get_obj_aliases(
 
     Return aliases for objects.
     """
-
     aliases: dict[str, str] = {}
     for name in names:
         try:
@@ -303,7 +293,6 @@ def get_default_obj_info(
 
     Returns dictionary of {object_name: default_patching_box}
     """
-
     wait_time = get_constant("wait_time")
 
     # create empty patch
@@ -324,7 +313,7 @@ def get_default_obj_info(
     time.sleep(wait_time)
 
     # read saved file
-    with open(defaultsfile, "r") as f:
+    with open(defaultsfile) as f:
         patchdict: JSONDict = json.loads(f.read())
 
     patchboxes = patchdict["patcher"]["boxes"][6:]  # ignoring the save/close objects
@@ -344,14 +333,11 @@ def add_barebones_objs(refs: list[str], patch: MaxPatch) -> None:
     """
     Add a barebones instantiation of each object in refs to the patch.
     """
-
     for ref in refs:
         xmltree = ET.parse(ref)
         root = xmltree.getroot()
         text = root.attrib["name"]  # get text from xml file
         patch.add_barebones_obj(text)
-
-    return
 
 
 def add_save_close(patch: MaxPatch) -> None:
@@ -359,13 +345,11 @@ def add_save_close(patch: MaxPatch) -> None:
     Helper func for get_default_obj_info.
     Puts thispatcher object arrangement in patch so that it opens, saves, and closes.
     """
-    with open(import_tools, "r") as f:
+    with open(import_tools) as f:
         tools: JSONDict = json.loads(f.read())
 
     patch._patcher_dict["patcher"]["boxes"] = tools["boxes"]
     patch._patcher_dict["patcher"]["lines"] = tools["lines"]
-
-    return
 
 
 # ************************************************************
@@ -379,7 +363,6 @@ def get_objarg_info(refs: list[str], names: list[str]) -> dict[str, ArgSections]
 
     Gets info on obj text arguments, returned as dictionary of required and optional arguments.
     """
-
     # arginfo template
     objarg_info: dict[str, ArgSections] = collections.defaultdict(
         lambda: {"required": [], "optional": []}
@@ -404,7 +387,6 @@ def get_objargs_by_flag(root: ET.Element, flag: str) -> list[ArgSpec]:
 
     Returns a list of cleaned dictionaries, with argument name and type.
     """
-
     findstring = "./objarglist/objarg" + flag
     args: list[ArgSpec] = []
 
@@ -448,7 +430,6 @@ def get_objattrib_info(refs: list[str], names: list[str]) -> dict[str, AttribLis
 
     Gets info on object attributes, returned as a dictionary containing name, type, and size.
     """
-
     # template for attribute info
     objattrib_info: dict[str, AttribList] = collections.defaultdict(list)
 
@@ -467,10 +448,8 @@ def get_objattrib_info(refs: list[str], names: list[str]) -> dict[str, AttribLis
             attrib_info = dict(attrib.attrib)
 
             # remove extraneous info
-            if "get" in attrib_info.keys():
-                del attrib_info["get"]
-            if "set" in attrib_info.keys():
-                del attrib_info["set"]
+            attrib_info.pop("get", None)
+            attrib_info.pop("set", None)
 
             # save to list
             objattrib_info[name].append(attrib_info)
@@ -490,7 +469,6 @@ def get_objinout_info(package: str, names: list[str]) -> dict[str, dict[str, Any
     Returns info about inlets/outlets affected by arguments.
     *Requires io files for each package, dictating the relationship between arguments and xlets.
     """
-
     objinout_info: dict[str, dict[str, Any]] = {}
     info: dict[str, dict[str, Any]] = {}
 
@@ -499,7 +477,7 @@ def get_objinout_info(package: str, names: list[str]) -> dict[str, dict[str, Any
 
     # read file
     if os.path.exists(info_file):
-        with open(info_file, "r") as f:
+        with open(info_file) as f:
             info = json.loads(f.read())
 
     # pull in info
@@ -530,7 +508,6 @@ def get_obj_doc_info(refs: list[str], names: list[str]) -> dict[str, JSONDict]:
     """
     Extract semantic documentation from XML ref files.
     """
-
     obj_doc_info: dict[str, JSONDict] = {}
 
     for ref, name in zip(refs, names):
@@ -716,7 +693,6 @@ def generate_stubs(
     """
     Generate Python stub modules for imported Max objects.
     """
-
     objects_dir = os.path.join(
         os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir)),
         "objects",
@@ -733,7 +709,7 @@ def generate_stubs(
 
         for json_file in json_files:
             max_name = Path(json_file).stem
-            with open(json_file, "r") as f:
+            with open(json_file) as f:
                 obj_info: JSONDict = json.load(f)
             py_name = sanitize_py_name(max_name)
             names_map[py_name] = max_name

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 def build_from_specs(
-    self: "MaxObject",
+    self: MaxObject,
     text: str,
     extra_attribs: dict[str, Any],
     abstraction: bool = False,
@@ -25,7 +25,6 @@ def build_from_specs(
 
     Builds object from in-box text and extra attributes given.
     """
-
     # parse into name, args, text_attribs
     self._name, self._args, self._text_attribs = self.parse_text(text)
 
@@ -87,13 +86,12 @@ def build_from_specs(
     return
 
 
-def build_from_dict(self: "MaxObject", given_dict: dict[str, Any]) -> None:
+def build_from_dict(self: MaxObject, given_dict: dict[str, Any]) -> None:
     """
     Helper function for instantiation.
 
     Builds object from given json dict representation.
     """
-
     # get name, args, attribs
     if given_dict["box"]["maxclass"] == "newobj":  # not ui obj
         self._name, self._args, self._text_attribs = self.parse_text(

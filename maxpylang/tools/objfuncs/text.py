@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def parse_text(
-    self: "MaxObject", text: str
+    self: MaxObject, text: str
 ) -> tuple[str, list[Union[str, int, float]], dict[str, list[str]]]:
     """
     Helper function for building objects.
@@ -27,7 +27,6 @@ def parse_text(
     args --> list of str
     text_attribs --> dict, {attribute_name: [vals]}
     """
-
     # remove leading/trailing whitespace and split into pieces
     parts = text.strip(" ").split(" ")
 
@@ -64,20 +63,17 @@ def parse_text(
     return name, typed_args, text_attribs
 
 
-def update_text(self: "MaxObject") -> None:
+def update_text(self: MaxObject) -> None:
     """
     Update text in MaxObject dict with name/args/attributes.
     """
     self._dict["box"]["text"] = self.get_text()
 
-    return
 
-
-def get_text(self: "MaxObject") -> str:
+def get_text(self: MaxObject) -> str:
     """
     Get text field for MaxObject dict from self.name/args/text_attribs.
     """
-
     if self._name != "message":
         text = self._name
     else:

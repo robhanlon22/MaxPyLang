@@ -1,6 +1,6 @@
-import os
 import json
-from typing import Any, Union
+import os
+from typing import Any
 
 """
 Set some constants.
@@ -61,45 +61,33 @@ def set_packages_path(newpath: str) -> None:
     """
     Set the path to the Packages folder where the Max app keeps package information.
     """
-
     set_constant("packages_path", newpath)
-
-    return
 
 
 def set_max_path(newpath: str) -> None:
     """
     Set the path to the Max application, likely in your applications folder.
     """
-
     refpath = os.path.join(newpath, "Contents/Resources/C74/docs/refpages/")
     set_constant("max_refpath", refpath)
 
-    return
 
-
-def set_wait_time(new_time: Union[int, float]) -> None:
+def set_wait_time(new_time: float) -> None:
     """
     Set the wait time for opening and closing Max files while importing packages.
     """
-
     set_constant("wait_time", new_time)
-
-    return
 
 
 def set_constant(name: str, val: Any) -> None:
     """
     Sets constants according to name and value.
     """
-
-    with open(constants_file, "r") as f:
+    with open(constants_file) as f:
         constants = json.loads(f.read())
     constants[name] = val
     with open(constants_file, "w") as f:
         json.dump(constants, f, indent=2)
-
-    return
 
 
 # **** FOR GETTING CONSTANTS *****
@@ -109,8 +97,7 @@ def get_constant(name: str) -> Any:
     """
     Returns the specified constant.
     """
-
-    with open(constants_file, "r") as f:
+    with open(constants_file) as f:
         constants = json.loads(f.read())
 
     return constants[name]
