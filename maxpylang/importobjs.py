@@ -1,594 +1,378 @@
+"""Utilities for importing Max object metadata and generating object stubs."""
+
 from __future__ import annotations
 
 import builtins
 import collections
-import glob
+import importlib
 import json
 import keyword
-import os
 import shutil
-import subprocess
+import textwrap
 import time
-import xml.etree.ElementTree as ET
+import webbrowser
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from .maxpatch import MaxPatch
-
-# import some constants...
 from .tools.constants import (
     get_constant,
     import_tools,
-    obj_info_folder,  # path to maxpy obj info folder
-    obj_io_folder,  # path to obj io folder
-)  # maxpatch json to add open/close functionality
+    obj_info_folder,
+    obj_io_folder,
+)
 
-# other constants
-common_box_standin = [{"name": "COMMON"}]  # for attributes
-available_argtypes = [
-    "int",
-    "symbol",
-    "number",
-    "list",
-    "any",
-    "float",
-]  # for arguments
-known_aliases = {"t": "trigger", "sel": "select", "b": "bangbang"}  # known aliases
+common_box_standin: list[dict[str, str]] = [{"name": "COMMON"}]
+available_argtypes: list[str] = ["int", "symbol", "number", "list", "any", "float"]
+known_aliases: dict[str, str] = {
+    "t": "trigger",
+    "sel": "select",
+    "b": "bangbang",
+}
 
-JSONDict = dict[str, Any]
-PackagePaths = dict[str, str]
-ArgSpec = dict[str, Any]
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+class _ElementLike(Protocol):
+    attrib: dict[str, str]
+
+    def find(self, path: str) -> _ElementLike | None: ...
+
+    def findall(self, path: str) -> list[_ElementLike]: ...
+
+    def itertext(self) -> Iterable[str]: ...
+
+
+class _ElementTreeLike(Protocol):
+    def getroot(self) -> _ElementLike: ...
+
+
+JSONValue = (
+    str | int | float | bool | None | list["JSONValue"] | dict[str, "JSONValue"]
+)
+JSONDict = dict[str, JSONValue]
+PackagePaths = dict[str, Path]
+ArgSpec = dict[str, str | list[str] | int | float | bool | None]
 ArgSections = dict[str, list[ArgSpec]]
-AttribList = list[dict[str, Any]]
+AttribList = list[dict[str, str]]
+ArgStatus = Literal["required", "optional"]
+JSONFileData = (
+    list[JSONDict]
+    | JSONDict
+    | dict[str, str]
+    | list[str]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
+
+_DOC_WIDTH = 88
+_json_width = 2
+try:
+    _xml_parser = importlib.import_module("defusedxml.ElementTree")
+except ModuleNotFoundError:  # pragma: no cover
+    _xml_parser = importlib.import_module("xml.etree.ElementTree")
 
 
 def import_objs(*packages: str, overwrite: bool = False) -> None:
-    """
-    Import objects from MaxMSP packages for compatibility with Python interface.
-    Creates object template files.
-
-    Requires io files for each package describing the relationship between inlets/outlets and arguments.
-
-    Usage:
-    input --> list of package folder names, use keyword "vanilla" as shortcut for [max, msp, jit].
-    overwrite --> flag to re-import previously imported objects
-
-    Make sure the Max application is OPEN when running this command!
-    If import fails, set wait_time higher and re-import.
-    """
-    # create obj_info_folder to hold ref_files
-    if not os.path.exists(obj_info_folder):
-        os.mkdir(obj_info_folder)
-
-    # get paths to Max ref files
-    package_paths = get_package_paths(list(packages))
-
-    # create maxpy info folder for each package
-    package_info_folders = prep_make_info_folders(package_paths, overwrite=overwrite)
-
-    # store object info
+    """Import objects from MaxMSP packages."""
+    package_paths = get_package_paths(packages)
+    package_info_folders = prep_make_info_folders(
+        package_paths,
+        overwrite=overwrite,
+    )
     save_obj_info(package_paths, package_info_folders)
-
-    # generate Python stub modules for imported objects
     generate_stubs(package_paths, package_info_folders)
 
 
-#############################################################################################
-########      SHOULD BE PRIVATE FUNCTIONS       #############################################
-#############################################################################################
+def get_package_paths(packages: Iterable[str]) -> PackagePaths:
+    """Build filesystem locations for Max package reference files."""
+    vanilla_refpath = Path(get_constant("max_refpath"))
+    packages_refpath = Path(get_constant("packages_path"))
 
-
-# ************************************************************
-# *************** FILE PATH STUFF ****************************
-# ************************************************************
-
-
-def get_package_paths(packages: list[str]) -> PackagePaths:
-    """
-    Gets paths to the Max reference directories for each package in specified list.
-    """
-    vanilla_refpath = get_constant("max_refpath")
-    packages_refpath = get_constant("packages_path")
+    resolved_packages: list[str] = []
+    for package in packages:
+        if package == "vanilla":
+            resolved_packages.extend(["max", "msp", "jit"])
+        else:
+            resolved_packages.append(package)
 
     package_paths: PackagePaths = {}
-
-    for package in packages:
-        # add max, msp, jit if vanilla
-        if package == "vanilla":
-            packages.append("max")
-            packages.append("msp")
-            packages.append("jit")
-
-        # add vanilla path for max, msp, jit
-        elif package == "max" or package == "msp" or package == "jit":
-            package_paths[package] = os.path.join(vanilla_refpath, package + "-ref")
-
-        # add from package path for all others
+    for package in resolved_packages:
+        if package in {"max", "msp", "jit"}:
+            package_paths[package] = vanilla_refpath / f"{package}-ref"
         else:
-            package_paths[package] = os.path.join(packages_refpath, package + "/docs")
+            package_paths[package] = packages_refpath / package / "docs"
 
     return package_paths
 
 
 def prep_make_info_folders(
-    package_paths: PackagePaths, overwrite: bool = False
+    package_paths: PackagePaths,
+    *,
+    overwrite: bool = False,
 ) -> PackagePaths:
-    """
-    Makes maxpy info folders for packages specified.
+    """Prepare obj-info output folders for imported packages."""
+    obj_info_root = Path(obj_info_folder)
+    obj_info_root.mkdir(parents=True, exist_ok=True)
 
-    Checks for package existance, deletes old folder if overwriting, makes new folder if new import.
-    """
     package_info_folders: PackagePaths = {}
     for package, package_path in package_paths.items():
-        # check to see if package exists
-        if not os.path.exists(package_path):
-            print("package", package, "not found")
+        if not package_path.exists():
+            continue
 
-        else:
-            # make path for package info folder
-            package_info_folder = os.path.join(obj_info_folder, package)
+        package_info_folder = obj_info_root / package
+        if package_info_folder.exists():
+            if not overwrite:
+                continue
+            shutil.rmtree(package_info_folder)
 
-            # if prev. imported and not overwriting, skip import
-            if os.path.exists(package_info_folder) and not overwrite:
-                print(package, "previously imported, skipping...")
-
-            else:
-                # otherwise, import
-
-                # remove old folder if necessary
-                if os.path.exists(
-                    package_info_folder
-                ):  # package prev imported, overwriting
-                    print("prepping to re-import", package, "...")
-                    shutil.rmtree(package_info_folder)  # remove old folder
-                else:
-                    print(
-                        "prepping to import", package, "..."
-                    )  # package importing for first time
-
-                # create new folder
-                os.mkdir(package_info_folder)
-
-                # add to dictionary
-                package_info_folders[package] = package_info_folder
-
-    print()
-    print(len(package_info_folders), "package(s) prepped, ready for import\n")
+        package_info_folder.mkdir()
+        package_info_folders[package] = package_info_folder
 
     return package_info_folders
 
 
-# ************************************************************
-# *************** FOR SAVING OBJECT INFO *********************
-# ************************************************************
-
-
 def save_obj_info(
-    package_paths: PackagePaths, package_info_folders: PackagePaths
+    package_paths: PackagePaths,
+    package_info_folders: PackagePaths,
 ) -> None:
-    """
-    Saves default, argument, attribute, and inlet/outlet info for each object in the specified packages.
-    Also saves obj aliases into obj_aliases.json file.
-    """
-    obj_aliases = known_aliases
+    """Save per-object default, argument, attribute, and I/O metadata."""
+    obj_aliases = dict(known_aliases)
 
-    # store object info, by package
     for package, info_folder in package_info_folders.items():
-        print("importing", package, "objects...")  # log
+        ref_folder = package_paths[package]
+        obj_refs = sorted(ref_folder.glob("*.maxref.xml"))
+        obj_refs = [ref for ref in obj_refs if not is_unlisted(ref)]
+        obj_names = [_object_name_from_ref(ref) for ref in obj_refs]
 
-        ref_folder = package_paths[package]  # max refs folder
-        obj_refs = sorted(
-            glob.glob(os.path.join(ref_folder, "*.maxref.xml"))
-        )  # get all object reffiles
-        obj_refs = [
-            ref for ref in obj_refs if not is_unlisted(ref)
-        ]  # remove unlisted objects
-        obj_names = [Path(Path(x).stem).stem for x in obj_refs]  # get object names
-
-        # get default obj info (dict for default instantiation)
-        print("\tgetting defaults...")
         default_obj_info = get_default_obj_info(package, obj_refs, obj_names)
-        print("\tdefaults retrieved\n")
-
-        # check for obj aliases
-        print("\tgetting aliases...")
         obj_aliases.update(get_obj_aliases(default_obj_info, obj_names))
-        print("\taliases retrieved\n")
-
-        # get objarg info (required and optional args, types, size)
-        print("\tgetting argument info...")
         objarg_info = get_objarg_info(obj_refs, obj_names)
-        print("\targument info retrieved\n")
-
-        # get attribute info (specific and/or specific attributes, types, size)
-        print("\tgetting attribute info...")
         objattrib_info = get_objattrib_info(obj_refs, obj_names)
-        print("\tattribute info retrieved\n")
-
-        # get inlet/outlet info (from io files)
-        print("\tgetting inlet/outlet info...")
         objinout_info = get_objinout_info(package, obj_names)
-        print("\tinlet/outlet info retrieved\n")
-
-        # get doc info (digest, description, inlets, outlets, methods)
-        print("\tgetting doc info...")
         obj_doc_info = get_obj_doc_info(obj_refs, obj_names)
-        print("\tdoc info retrieved\n")
 
-        # save maxpy obj info files
-        print("\tsaving object info files...")
         for name in obj_names:
-            obj_info: JSONDict = {
+            obj_info = {
                 "default": default_obj_info[name],
                 "args": objarg_info[name],
                 "attribs": objattrib_info[name],
                 "in/out": objinout_info[name],
                 "doc": obj_doc_info[name],
             }
+            _write_json(info_folder / f"{name}.json", obj_info)
 
-            obj_file = os.path.join(info_folder, name + ".json")
-            with open(obj_file, "w") as f:
-                json.dump(obj_info, f, indent=2)
-
-        print("\t", len(obj_names), "object info files saved\n")
-        print(package, "imported successfully,", len(obj_names), "objects imported\n")
-
-    # save aliases
-    aliases_file = os.path.join(obj_info_folder, "obj_aliases.json")
-    with open(aliases_file, "w") as f:
-        json.dump(obj_aliases, f, indent=2)
-    print("object aliases saved successfully")
+    _write_json(Path(obj_info_folder) / "obj_aliases.json", obj_aliases)
 
 
-def is_unlisted(ref: str) -> bool:
-    """
-    Helper func for saving object info.
-    Returns true if an object is unlisted.
-
-    ref --> Max reference file of the object
-    """
-    xmltree = ET.parse(ref)
-    root = xmltree.getroot()
-    if "category" in root.attrib.keys():
-        category = root.attrib["category"]
-    else:
-        return False
-
-    return category == "Unlisted"
+def is_unlisted(ref: Path) -> bool:
+    """Return ``True`` if an object is marked as unlisted."""
+    root = _parse_xml(ref).getroot()
+    return root.attrib.get("category") == "Unlisted"
 
 
 def get_obj_aliases(
     default_info: dict[str, JSONDict], names: list[str]
 ) -> dict[str, str]:
-    """
-    Helper for saving obj info.
-
-    Return aliases for objects.
-    """
+    """Map default text labels back to their object names."""
     aliases: dict[str, str] = {}
     for name in names:
-        try:
-            default_text = default_info[name]["box"]["text"]
-            if name != default_text:  # object name is different from text-field string
-                aliases[default_text] = name
-        except KeyError:
-            pass
+        default_text = default_info.get(name, {}).get("box", {}).get("text")
+        if default_text and default_text != name:
+            aliases[default_text] = name
 
     return aliases
 
 
-# ************************************************************
-# *************** GETTING DEFAULT OBJ INFO *******************
-# ************************************************************
-
-
 def get_default_obj_info(
-    package: str, refs: list[str], names: list[str]
+    package: str,
+    refs: list[Path],
+    names: list[str],
 ) -> dict[str, JSONDict]:
-    """
-    Helper function for import_objs().
-    Place objects in a MaxPatch and extracts default settings.
-
-    *relies on the fact that Max will save 'barebones' objects with default parameters auto-filled in.
-
-    Returns dictionary of {object_name: default_patching_box}
-    """
-    wait_time = get_constant("wait_time")
-
-    # create empty patch
+    """Place objects in a patch and extract saved default arguments."""
+    wait_time = float(get_constant("wait_time"))
     patch = MaxPatch(verbose=False)
-
-    # add save+close mechanism to patch
     add_save_close(patch)
-
-    # manually add barebones object dicts to patch
     add_barebones_objs(refs, patch)
 
-    # temporarily save patch
-    defaultsfile = "defaults_" + package + ".maxpat"
-    patch.save(filename=defaultsfile, verbose=False)
-
-    # open file, wait for it to save and close
-    subprocess.call(["open", defaultsfile])
+    defaults_file = Path(f"defaults_{package}.maxpat")
+    patch.save(filename=str(defaults_file), verbose=False)
+    _open_defaults_file(defaults_file)
     time.sleep(wait_time)
 
-    # read saved file
-    with open(defaultsfile) as f:
-        patchdict: JSONDict = json.loads(f.read())
+    with defaults_file.open() as f:
+        patchdict: JSONDict = json.load(f)
 
-    patchboxes = patchdict["patcher"]["boxes"][6:]  # ignoring the save/close objects
+    patchboxes = patchdict["patcher"]["boxes"][6:]
+    obj_info: dict[str, JSONDict] = dict(zip(names, patchboxes))
 
-    # parse for object info
-    obj_info: dict[str, JSONDict] = {}
-    for name, box in zip(names, patchboxes):
-        obj_info[name] = box
-
-    # remove defaults file
-    os.remove(defaultsfile)
+    if defaults_file.exists():
+        defaults_file.unlink()
 
     return obj_info
 
 
-def add_barebones_objs(refs: list[str], patch: MaxPatch) -> None:
-    """
-    Add a barebones instantiation of each object in refs to the patch.
-    """
+def _open_defaults_file(defaults_file: Path) -> None:
+    """Open the generated maxpat file for one-shot Max patch evaluation."""
+    webbrowser.open(defaults_file.as_uri())
+
+
+def add_barebones_objs(refs: list[Path], patch: MaxPatch) -> None:
+    """Add a barebones instance of every object into patch for metadata export."""
     for ref in refs:
-        xmltree = ET.parse(ref)
-        root = xmltree.getroot()
-        text = root.attrib["name"]  # get text from xml file
-        patch.add_barebones_obj(text)
+        root = _parse_xml(ref).getroot()
+        patch.add_barebones_obj(root.attrib["name"])
 
 
 def add_save_close(patch: MaxPatch) -> None:
-    """
-    Helper func for get_default_obj_info.
-    Puts thispatcher object arrangement in patch so that it opens, saves, and closes.
-    """
-    with open(import_tools) as f:
-        tools: JSONDict = json.loads(f.read())
-
-    patch._patcher_dict["patcher"]["boxes"] = tools["boxes"]
-    patch._patcher_dict["patcher"]["lines"] = tools["lines"]
+    """Add template objects that save and close the patch."""
+    tools = _read_json(Path(import_tools))
+    patcher = patch.__dict__["_patcher_dict"]
+    patcher["patcher"]["boxes"] = tools["boxes"]
+    patcher["patcher"]["lines"] = tools["lines"]
 
 
-# ************************************************************
-# *************** GETTING OBJ ARGUMENT INFO ******************
-# ************************************************************
-
-
-def get_objarg_info(refs: list[str], names: list[str]) -> dict[str, ArgSections]:
-    """
-    Helper func for import_objs.
-
-    Gets info on obj text arguments, returned as dictionary of required and optional arguments.
-    """
-    # arginfo template
+def get_objarg_info(refs: list[Path], names: list[str]) -> dict[str, ArgSections]:
+    """Gather required and optional object arguments."""
     objarg_info: dict[str, ArgSections] = collections.defaultdict(
         lambda: {"required": [], "optional": []}
     )
 
-    # for each obj...
     for ref, name in zip(refs, names):
-        # parse ref file
-        xmltree = ET.parse(ref)
-        root = xmltree.getroot()
-
-        # get required and optional args
+        root = _parse_xml(ref).getroot()
         objarg_info[name]["required"] = get_objargs_by_flag(root, "[@optional='0']")
         objarg_info[name]["optional"] = get_objargs_by_flag(root, "[@optional='1']")
 
     return objarg_info
 
 
-def get_objargs_by_flag(root: ET.Element, flag: str) -> list[ArgSpec]:
-    """
-    Retrieves objargs from xml file, according to flag.
-
-    Returns a list of cleaned dictionaries, with argument name and type.
-    """
+def get_objargs_by_flag(root: _ElementTreeLike, flag: str) -> list[ArgSpec]:
+    """Extract object arguments from an XML element matching a flag."""
     findstring = "./objarglist/objarg" + flag
     args: list[ArgSpec] = []
 
     for objarg in root.findall(findstring):
-        # get attrib dict
-        objarg_info: ArgSpec = dict(objarg.attrib)
-
-        # check for placeholder arg
+        objarg_info = dict(objarg.attrib)
         if not (
             objarg_info["name"] == "OBJARG_NAME"
             and objarg_info["type"] == "OBJARG_TYPE"
         ):
-            # get argtypes
             if "type" not in objarg_info:
                 objarg_info["type"] = []
             else:
-                # parse list of possible types, bc reffile might list it as "int, string, or float" etc.
                 objarg_info["type"] = [
                     argtype
                     for argtype in available_argtypes
                     if argtype in objarg_info["type"]
                 ]
-
-            # don't need to log the optional flag
-            del objarg_info["optional"]
-
-            # save to list
+            objarg_info.pop("optional", None)
             args.append(objarg_info)
 
     return args
 
 
-# ************************************************************
-# *************** GETTING OBJ ATTRIB INFO ********************
-# ************************************************************
-
-
-def get_objattrib_info(refs: list[str], names: list[str]) -> dict[str, AttribList]:
-    """
-    Helper func for import_objs.
-
-    Gets info on object attributes, returned as a dictionary containing name, type, and size.
-    """
-    # template for attribute info
+def get_objattrib_info(refs: list[Path], names: list[str]) -> dict[str, AttribList]:
+    """Extract object attribute metadata from XML."""
     objattrib_info: dict[str, AttribList] = collections.defaultdict(list)
 
-    # for each obj...
     for ref, name in zip(refs, names):
-        # parse xml file
-        xmltree = ET.parse(ref)
-        root = xmltree.getroot()
-
-        # add common box if not UI object
-        if "category" in root.attrib.keys() and root.attrib["category"] != "U/I":
+        root = _parse_xml(ref).getroot()
+        if root.attrib.get("category") != "U/I":
             objattrib_info[name] += common_box_standin
 
-        # get all attributes
         for attrib in root.findall("./attributelist/attribute"):
             attrib_info = dict(attrib.attrib)
-
-            # remove extraneous info
             attrib_info.pop("get", None)
             attrib_info.pop("set", None)
-
-            # save to list
             objattrib_info[name].append(attrib_info)
 
     return objattrib_info
 
 
-# ************************************************************
-# *************** GETTING OBJ XLET INFO **********************
-# ************************************************************
+def get_objinout_info(
+    package: str, names: list[str]
+) -> dict[str, dict[str, JSONValue]]:
+    """Extract I/O relationship metadata for each object."""
+    info_file = Path(obj_io_folder) / f"{package}_io.json"
+    info: dict[str, dict[str, JSONValue]] = {}
+    if info_file.exists():
+        info = _read_json(info_file)
+
+    return {name: info.get(name, {}) for name in names}
 
 
-def get_objinout_info(package: str, names: list[str]) -> dict[str, dict[str, Any]]:
-    """
-    Helper func for get_default_obj_info.
-
-    Returns info about inlets/outlets affected by arguments.
-    *Requires io files for each package, dictating the relationship between arguments and xlets.
-    """
-    objinout_info: dict[str, dict[str, Any]] = {}
-    info: dict[str, dict[str, Any]] = {}
-
-    # get path to io file
-    info_file = os.path.join(obj_io_folder, package + "_io.json")
-
-    # read file
-    if os.path.exists(info_file):
-        with open(info_file) as f:
-            info = json.loads(f.read())
-
-    # pull in info
-    for name in names:
-        if name in info.keys():
-            objinout_info[name] = info[name]
-        else:
-            objinout_info[name] = {}
-
-    return objinout_info
-
-
-# ************************************************************
-# *************** GETTING OBJ DOC INFO ***********************
-# ************************************************************
-
-
-def strip_xml_text(element: ET.Element | None) -> str:
-    """
-    Extract plain text from an XML element, stripping inline tags.
-    """
+def strip_xml_text(element: _ElementLike | None) -> str:
+    """Strip XML markup and return plain text for a node."""
     if element is None:
         return ""
     return "".join(element.itertext()).strip()
 
 
-def get_obj_doc_info(refs: list[str], names: list[str]) -> dict[str, JSONDict]:
-    """
-    Extract semantic documentation from XML ref files.
-    """
+def get_obj_doc_info(refs: list[Path], names: list[str]) -> dict[str, JSONDict]:
+    """Extract documentation metadata from XML reference files."""
     obj_doc_info: dict[str, JSONDict] = {}
 
     for ref, name in zip(refs, names):
-        xmltree = ET.parse(ref)
-        root = xmltree.getroot()
-
-        doc: JSONDict = {}
-
-        digest_text = strip_xml_text(root.find("digest"))
-        if digest_text and digest_text != "TEXT_HERE":
-            doc["digest"] = digest_text
-
-        desc_text = strip_xml_text(root.find("description"))
-        if desc_text and desc_text != "TEXT_HERE":
-            doc["description"] = desc_text
-
-        inlets: list[JSONDict] = []
-        for inlet in root.findall("./inletlist/inlet"):
-            inlet_info: JSONDict = dict(inlet.attrib)
-            inlet_digest = strip_xml_text(inlet.find("digest"))
-            if inlet_digest and inlet_digest != "TEXT_HERE":
-                inlet_info["digest"] = inlet_digest
-            inlet_desc = strip_xml_text(inlet.find("description"))
-            if inlet_desc and inlet_desc != "TEXT_HERE":
-                inlet_info["description"] = inlet_desc
-            inlets.append(inlet_info)
-        if inlets:
-            doc["inlets"] = inlets
-
-        outlets: list[JSONDict] = []
-        for outlet in root.findall("./outletlist/outlet"):
-            outlet_info: JSONDict = dict(outlet.attrib)
-            outlet_digest = strip_xml_text(outlet.find("digest"))
-            if outlet_digest and outlet_digest != "TEXT_HERE":
-                outlet_info["digest"] = outlet_digest
-            outlet_desc = strip_xml_text(outlet.find("description"))
-            if outlet_desc and outlet_desc != "TEXT_HERE":
-                outlet_info["description"] = outlet_desc
-            outlets.append(outlet_info)
-        if outlets:
-            doc["outlets"] = outlets
-
-        methods: list[JSONDict] = []
-        for method in root.findall("./methodlist/method"):
-            method_info: JSONDict = dict(method.attrib)
-            method_digest = strip_xml_text(method.find("digest"))
-            if method_digest and method_digest != "TEXT_HERE":
-                method_info["digest"] = method_digest
-            method_desc = strip_xml_text(method.find("description"))
-            if method_desc and method_desc != "TEXT_HERE":
-                method_info["description"] = method_desc
-
-            arglist = method.find("arglist")
-            if arglist is not None:
-                args: list[JSONDict] = [
-                    dict(arg.attrib) for arg in arglist.findall("arg")
-                ]
-                if args:
-                    method_info["args"] = args
-
-            methods.append(method_info)
-        if methods:
-            doc["methods"] = methods
-
+        root = _parse_xml(ref).getroot()
+        doc = _read_doc_fields(root)
+        doc["inlets"] = _read_xlet_metadata(root.findall("./inletlist/inlet"))
+        doc["outlets"] = _read_xlet_metadata(root.findall("./outletlist/outlet"))
+        methods = root.findall("./methodlist/method")
+        method_info = [_read_method_metadata(method) for method in methods]
+        doc["methods"] = method_info
         obj_doc_info[name] = doc
 
     return obj_doc_info
 
 
-# ************************************************************
-# *************** PYTHON STUB GENERATION *********************
-# ************************************************************
+def _read_doc_fields(root: _ElementLike) -> JSONDict:
+    """Read shared documentation sections from an XML object definition."""
+    doc: JSONDict = {}
+    _set_optional_text(doc, "digest", root.find("digest"))
+    _set_optional_text(doc, "description", root.find("description"))
+    return doc
+
+
+def _read_xlet_metadata(nodes: list[_ElementLike]) -> list[JSONDict]:
+    """Read inlet/outlet metadata nodes."""
+    xlets: list[JSONDict] = []
+    for node in nodes:
+        xlet = dict(node.attrib)
+        _set_optional_text(xlet, "digest", node.find("digest"))
+        _set_optional_text(xlet, "description", node.find("description"))
+        xlets.append(xlet)
+    return xlets
+
+
+def _read_method_metadata(method: _ElementLike) -> JSONDict:
+    """Read method metadata and nested argument details."""
+    method_info = dict(method.attrib)
+    _set_optional_text(method_info, "digest", method.find("digest"))
+    _set_optional_text(method_info, "description", method.find("description"))
+
+    arglist = method.find("arglist")
+    if arglist is not None:
+        args = [dict(arg.attrib) for arg in arglist.findall("arg")]
+        if args:
+            method_info["args"] = args
+
+    return method_info
+
+
+def _set_optional_text(target: JSONDict, key: str, node: _ElementLike | None) -> None:
+    """Add an XML text value if it is non-empty and not a placeholder."""
+    value = strip_xml_text(node) if node is not None else ""
+    if value and value != "TEXT_HERE":
+        target[key] = value
 
 
 def sanitize_py_name(max_name: str) -> str:
-    """
-    Convert a Max object name to a valid Python identifier.
-    """
+    """Convert a Max object name to a valid Python identifier."""
     name = max_name.replace("~", "_tilde")
-    name = name.replace(".", "_")
-    name = name.replace("-", "_")
+    name = name.replace(".", "_").replace("-", "_")
     if name and name[0].isdigit():
         name = "_" + name
     if keyword.iskeyword(name) or name in dir(builtins):
@@ -597,110 +381,163 @@ def sanitize_py_name(max_name: str) -> str:
 
 
 def _build_docstring(max_name: str, obj_info: JSONDict) -> str:
-    """
-    Build a docstring for a Max object from its JSON info.
-    """
+    """Build a short wrapped docstring for a generated object constant."""
     doc = obj_info.get("doc", {})
     args = obj_info.get("args", {})
     attribs = obj_info.get("attribs", [])
 
     lines: list[str] = []
+    name_with_digest = f"{max_name} - {doc.get('digest', '')}".rstrip(" -")
+    lines.append(name_with_digest)
+    _append_optional_text(lines, doc.get("description"))
+    _append_args(lines, args)
+    _append_inlets(lines, doc.get("inlets"))
+    _append_outlets(lines, doc.get("outlets"))
+    _append_methods(lines, doc.get("methods"))
+    _append_attributes(lines, attribs)
 
-    digest = doc.get("digest", "")
+    return "\n".join(_wrap_lines(lines))
+
+
+def _append_optional_text(lines: list[str], value: str | None) -> None:
+    """Append a wrapped description paragraph when present."""
+    if not value:
+        return
+    lines.append("")
+    lines.extend(_wrap_lines([value]))
+
+
+def _append_args(lines: list[str], args: JSONValue) -> None:
+    """Append formatted required and optional argument lines."""
+    if not isinstance(args, dict):
+        return
+
+    required_args = args.get("required", [])
+    optional_args = args.get("optional", [])
+    if not isinstance(required_args, list):
+        required_args = []
+    if not isinstance(optional_args, list):
+        optional_args = []
+    if not required_args and not optional_args:
+        return
+
+    lines.append("")
+    lines.append("Args:")
+    lines.extend(_iter_arg_lines(required_args, "required"))
+    lines.extend(_iter_arg_lines(optional_args, "optional"))
+
+
+def _iter_arg_lines(args: list[ArgSpec], status: ArgStatus) -> Iterable[str]:
+    """Yield wrapped argument lines in required/optional format."""
+    for arg in args:
+        arg_type_value = arg.get("type", [])
+        if isinstance(arg_type_value, list):
+            arg_type = ", ".join(arg_type_value)
+        else:
+            arg_type = arg_type_value
+        yield f"{arg.get('name', '?')} ({arg_type}, {status})"
+
+
+def _append_inlets(lines: list[str], inlets: list[JSONDict] | None) -> None:
+    """Append inlet metadata lines."""
+    if not inlets:
+        return
+    lines.append("")
+    lines.append("Inlets:")
+    for idx, inlet in enumerate(inlets):
+        line = _io_line(idx, inlet)
+        lines.extend(_wrap_lines([line], prefix="  "))
+
+
+def _append_outlets(lines: list[str], outlets: list[JSONDict] | None) -> None:
+    """Append outlet metadata lines."""
+    if not outlets:
+        return
+    lines.append("")
+    lines.append("Outlets:")
+    for idx, outlet in enumerate(outlets):
+        line = _io_line(idx, outlet)
+        lines.extend(_wrap_lines([line], prefix="  "))
+
+
+def _append_methods(lines: list[str], methods: list[JSONDict] | None) -> None:
+    """Append messages section."""
+    if not methods:
+        return
+    method_names = [method.get("name", "") for method in methods if method.get("name")]
+    if not method_names:
+        return
+    lines.append("")
+    lines.append("Messages:")
+    lines.extend(_wrap_lines([", ".join(method_names)], prefix="  "))
+
+
+def _append_attributes(lines: list[str], attribs: list[dict[str, str]]) -> None:
+    """Append attributes section."""
+    attrib_names = [
+        attrib.get("name", "")
+        for attrib in attribs
+        if attrib.get("name") and attrib.get("name") != "COMMON"
+    ]
+    if not attrib_names:
+        return
+    lines.append("")
+    lines.append("Attributes:")
+    lines.extend(_wrap_lines([", ".join(attrib_names)], prefix="  "))
+
+
+def _io_line(index: int, metadata: JSONDict) -> str:
+    """Format an inlet or outlet metadata row."""
+    idx = metadata.get("id", str(index))
+    io_type = metadata.get("type", "")
+    digest = metadata.get("digest", "")
+    if io_type and digest:
+        return f"{idx} ({io_type}): {digest}"
+    if io_type:
+        return f"{idx} ({io_type})"
     if digest:
-        lines.append(f"{max_name} - {digest}")
-    else:
-        lines.append(max_name)
+        return f"{idx}: {digest}"
+    return str(idx)
 
-    description = doc.get("description", "")
-    if description:
-        lines.append("")
-        lines.append(description)
 
-    req_args = args.get("required", [])
-    opt_args = args.get("optional", [])
-    if req_args or opt_args:
-        lines.append("")
-        lines.append("Args:")
-        for arg in req_args:
-            arg_type = (
-                ", ".join(arg.get("type", []))
-                if isinstance(arg.get("type"), list)
-                else arg.get("type", "")
+def _wrap_lines(lines: list[str], prefix: str = "") -> list[str]:
+    """Wrap non-empty text to the configured line width."""
+    wrapped: list[str] = []
+    for original_line in lines:
+        line = " ".join(str(original_line).split())
+        if not line:
+            wrapped.append("")
+            continue
+        available_width = _DOC_WIDTH - 4 - len(prefix)
+        if len(line) <= available_width:
+            wrapped.append(f"{prefix}{line}")
+            continue
+        wrapped.extend(
+            f"{prefix}{wrapped_line}"
+            for wrapped_line in textwrap.wrap(
+                line,
+                width=available_width,
+                break_long_words=False,
+                break_on_hyphens=False,
             )
-            lines.append(f"  {arg.get('name', '?')} ({arg_type}, required)")
-        for arg in opt_args:
-            arg_type = (
-                ", ".join(arg.get("type", []))
-                if isinstance(arg.get("type"), list)
-                else arg.get("type", "")
-            )
-            lines.append(f"  {arg.get('name', '?')} ({arg_type}, optional)")
-
-    inlets = doc.get("inlets", [])
-    if inlets:
-        lines.append("")
-        lines.append("Inlets:")
-        for i, inlet in enumerate(inlets):
-            idx = inlet.get("id", str(i))
-            inlet_type = inlet.get("type", "")
-            digest_text = inlet.get("digest", "")
-            if inlet_type and digest_text:
-                lines.append(f"  {idx} ({inlet_type}): {digest_text}")
-            elif digest_text:
-                lines.append(f"  {idx}: {digest_text}")
-            elif inlet_type:
-                lines.append(f"  {idx} ({inlet_type})")
-
-    outlets = doc.get("outlets", [])
-    if outlets:
-        lines.append("")
-        lines.append("Outlets:")
-        for i, outlet in enumerate(outlets):
-            idx = outlet.get("id", str(i))
-            outlet_type = outlet.get("type", "")
-            digest_text = outlet.get("digest", "")
-            if outlet_type and digest_text:
-                lines.append(f"  {idx} ({outlet_type}): {digest_text}")
-            elif digest_text:
-                lines.append(f"  {idx}: {digest_text}")
-            elif outlet_type:
-                lines.append(f"  {idx} ({outlet_type})")
-
-    methods = doc.get("methods", [])
-    if methods:
-        method_names = [m.get("name", "") for m in methods if m.get("name")]
-        if method_names:
-            lines.append("")
-            lines.append("Messages: " + ", ".join(method_names))
-
-    if attribs:
-        attrib_names = [
-            attrib.get("name", "")
-            for attrib in attribs
-            if attrib.get("name") and attrib.get("name") != "COMMON"
-        ]
-        if attrib_names:
-            lines.append("")
-            lines.append("Attributes: " + ", ".join(attrib_names))
-
-    return "\n".join(lines)
+        )
+    return wrapped
 
 
 def generate_stubs(
-    _package_paths: PackagePaths, package_info_folders: PackagePaths
+    _package_paths: PackagePaths,
+    package_info_folders: PackagePaths,
 ) -> None:
-    """
-    Generate Python stub modules for imported Max objects.
-    """
-    objects_dir = os.path.join(
-        os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir)),
-        "objects",
-    )
-    os.makedirs(objects_dir, exist_ok=True)
+    """Write generated object stub modules for each imported package."""
+    objects_dir = Path(__file__).resolve().parent / "objects"
+    objects_dir.mkdir(parents=True, exist_ok=True)
 
     for package, info_folder in package_info_folders.items():
-        json_files = sorted(glob.glob(os.path.join(info_folder, "*.json")))
+        json_files = [
+            path
+            for path in sorted(info_folder.glob("*.json"))
+            if path.name != "obj_aliases.json"
+        ]
         if not json_files:
             continue
 
@@ -708,90 +545,111 @@ def generate_stubs(
         obj_infos: dict[str, JSONDict] = {}
 
         for json_file in json_files:
-            max_name = Path(json_file).stem
-            with open(json_file) as f:
-                obj_info: JSONDict = json.load(f)
+            max_name = _object_name_from_ref(json_file)
+            obj_info = _read_json(json_file)
             py_name = sanitize_py_name(max_name)
             names_map[py_name] = max_name
             obj_infos[max_name] = obj_info
 
-        stub_lines: list[str] = []
-        stub_lines.append(
-            f'"""MaxObject stubs for {package} objects. Auto-generated by import_objs()."""'
-        )
-        stub_lines.append("import os as _os")
-        stub_lines.append("import sys as _sys")
-        stub_lines.append("from maxpylang.maxobject import MaxObject")
-        stub_lines.append("")
+        stub_lines = _build_stub_lines(names_map, obj_infos)
+        (objects_dir / f"{package}.py").write_text("\n".join(stub_lines) + "\n")
 
-        all_names = sorted(names_map.keys())
-        stub_lines.append("__all__ = [")
-        for py_name in all_names:
-            stub_lines.append(f"    {py_name!r},")
-        stub_lines.append("]")
-        stub_lines.append("")
+    init_lines = _build_objects_init_lines(objects_dir)
+    (objects_dir / "__init__.py").write_text("\n".join(init_lines) + "\n")
 
-        stub_lines.append("_NAMES = {")
-        for py_name in all_names:
-            stub_lines.append(f"    {py_name!r}: {names_map[py_name]!r},")
-        stub_lines.append("}")
-        stub_lines.append("")
 
-        stub_lines.append("_devnull = open(_os.devnull, 'w')")
-        stub_lines.append("_old_stdout = _sys.stdout")
-        stub_lines.append("_sys.stdout = _devnull")
-        stub_lines.append("")
-
-        for py_name in all_names:
-            max_name = names_map[py_name]
-            obj_info = obj_infos[max_name]
-            docstring = "\n".join(
-                line.rstrip()
-                for line in _build_docstring(max_name, obj_info).splitlines()
-            ).replace('"""', '\\"""')
-
-            stub_lines.append('"""')
-            stub_lines.append(docstring)
-            stub_lines.append('"""')
-            stub_lines.append(f"{py_name} = MaxObject({max_name!r})")
-            stub_lines.append("")
-
-        stub_lines.append("_sys.stdout = _old_stdout")
-        stub_lines.append("_devnull.close()")
-        stub_lines.append("del _devnull, _old_stdout")
-        stub_lines.append("")
-
-        stub_path = os.path.join(objects_dir, f"{package}.py")
-        with open(stub_path, "w") as f:
-            f.write("\n".join(stub_lines))
-
-        print(
-            f"\tstub module generated: objects/{package}.py ({len(names_map)} objects)"
-        )
-
-    init_path = os.path.join(objects_dir, "__init__.py")
-    existing_stubs = [
-        Path(path).stem
-        for path in sorted(glob.glob(os.path.join(objects_dir, "*.py")))
-        if Path(path).stem != "__init__"
+def _build_stub_lines(
+    names_map: dict[str, str],
+    obj_infos: dict[str, JSONDict],
+) -> list[str]:
+    """Compose the Python source for a single package stub module."""
+    all_names = sorted(names_map)
+    lines = [
+        '"""Generated MaxObject stubs."""',
+        "",
+        "from contextlib import redirect_stdout",
+        "from io import StringIO",
+        "from maxpylang.maxobject import MaxObject",
+        "",
+        "__all__ = [",
     ]
+    lines.extend(f"    {name!r}," for name in all_names)
+    lines.append("]")
+    lines.append("")
+    lines.append("_NAMES = {")
+    lines.extend(
+        f"    {py_name!r}: {max_name!r},"
+        for py_name in all_names
+        for max_name in [names_map[py_name]]
+    )
+    lines.append("}")
+    lines.append("")
+    lines.append("_output = StringIO()")
+    lines.append("with redirect_stdout(_output):")
+
+    for py_name in all_names:
+        max_name = names_map[py_name]
+        obj_info = obj_infos[max_name]
+        docstring = _build_docstring(max_name, obj_info).replace('"""', '\\"""')
+        lines.append(f"    {py_name} = MaxObject({max_name!r})")
+        lines.append(f'    {py_name}.__doc__ = """')
+        for doc_line in docstring.splitlines():
+            if doc_line:
+                lines.append(f"    {doc_line}")
+            else:
+                lines.append("")
+        lines.append('    """')
+        lines.append("")
+    lines.append("")
+    lines.append("del _output")
+    return lines
+
+
+def _build_objects_init_lines(objects_dir: Path) -> list[str]:
+    """Compose the package init file to import all generated stubs."""
+    existing_stubs = [path.stem for path in sorted(objects_dir.glob("*.py"))]
     init_lines = [
         '"""Pre-instantiated MaxObject stubs for all imported packages."""',
         "# ruff: noqa: F403",
         "import warnings",
+        "import contextlib",
         "from maxpylang.exceptions import UnknownObjectWarning",
         "",
-        "# Stubs intentionally create objects without args; suppress warnings during import",
+        "# Suppress warnings while loading stubs.",
         "with warnings.catch_warnings():",
         '    warnings.simplefilter("ignore", UnknownObjectWarning)',
     ]
-    for stem in existing_stubs:
-        init_lines.append("    try:")
-        init_lines.append(f"        from .{stem} import *")
-        init_lines.append("    except ImportError:")
-        init_lines.append("        pass")
+    for stem in sorted(existing_stubs):
+        if stem == "__init__":
+            continue
+        init_lines.extend(
+            [
+                "    with contextlib.suppress(ImportError):",
+                f"        from .{stem} import *",
+            ]
+        )
 
-    with open(init_path, "w") as f:
-        f.write("\n".join(init_lines) + "\n")
+    return init_lines
 
-    print("stub generation complete\n")
+
+def _object_name_from_ref(ref: Path) -> str:
+    """Convert a Max reference filename to the object's canonical name."""
+    stem = ref.stem
+    return stem.removesuffix(".maxref")
+
+
+def _read_json(path: Path) -> JSONDict:
+    """Read a JSON file into a dictionary."""
+    with path.open() as f:
+        return json.load(f)
+
+
+def _write_json(path: Path, data: JSONFileData) -> None:
+    """Write JSON data to disk with consistent indentation."""
+    with path.open("w") as f:
+        json.dump(data, f, indent=_json_width)
+
+
+def _parse_xml(path: Path) -> _ElementTreeLike:
+    """Parse an XML file with the configured parser."""
+    return _xml_parser.parse(path.as_posix())

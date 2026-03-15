@@ -1,23 +1,16 @@
 """Pre-instantiated MaxObject stubs for all imported packages."""
-
 # ruff: noqa: F403
-
+import contextlib
 import warnings
 
 from maxpylang.exceptions import UnknownObjectWarning
 
-# Stubs intentionally create objects without args; suppress warnings during import
+# Suppress warnings while loading stubs.
 with warnings.catch_warnings():
     warnings.simplefilter("ignore", UnknownObjectWarning)
-    try:
+    with contextlib.suppress(ImportError):
         from .jit import *
-    except ImportError:
-        pass
-    try:
+    with contextlib.suppress(ImportError):
         from .max import *
-    except ImportError:
-        pass
-    try:
+    with contextlib.suppress(ImportError):
         from .msp import *
-    except ImportError:
-        pass
