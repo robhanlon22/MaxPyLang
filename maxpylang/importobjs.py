@@ -7,6 +7,7 @@ import collections
 import importlib
 import json
 import keyword
+import logging
 import shutil
 import textwrap
 import time
@@ -21,7 +22,6 @@ from .tools.constants import (
     obj_info_folder,
     obj_io_folder,
 )
-from .tools.misc import write_stdout
 
 common_box_standin: list[dict[str, str]] = [{"name": "COMMON"}]
 available_argtypes: list[str] = ["int", "symbol", "number", "list", "any", "float"]
@@ -60,6 +60,7 @@ JSONFileData = Any
 
 _DOC_WIDTH = 88
 _json_width = 2
+_LOGGER = logging.getLogger(__name__)
 try:
     _xml_parser = importlib.import_module("defusedxml.ElementTree")
 except ModuleNotFoundError:  # pragma: no cover
@@ -113,18 +114,18 @@ def prep_make_info_folders(
     for package, package_path_value in package_paths.items():
         package_path = Path(package_path_value)
         if not package_path.exists():
-            write_stdout("package", package, "not found")
+            _LOGGER.error("package %s not found", package)
             continue
 
         package_info_folder = obj_info_root / package
         if package_info_folder.exists():
             if not overwrite:
-                write_stdout(package, "previously imported, skipping...")
+                _LOGGER.info("%s previously imported, skipping...", package)
                 continue
-            write_stdout("prepping to re-import", package)
+            _LOGGER.info("prepping to re-import %s", package)
             shutil.rmtree(package_info_folder)
         else:
-            write_stdout("prepping to import", package)
+            _LOGGER.info("prepping to import %s", package)
 
         package_info_folder.mkdir()
         package_info_folders[package] = package_info_folder
@@ -140,7 +141,7 @@ def save_obj_info(
     obj_aliases = dict(known_aliases)
 
     for package, info_folder_value in package_info_folders.items():
-        write_stdout("importing", package, "objects...")
+        _LOGGER.info("importing %s objects...", package)
         ref_folder = Path(package_paths[package])
         info_folder = Path(info_folder_value)
         obj_refs = sorted(ref_folder.glob("*.maxref.xml"))
@@ -163,10 +164,10 @@ def save_obj_info(
                 "doc": obj_doc_info[name],
             }
             _write_json(info_folder / f"{name}.json", obj_info)
-        write_stdout(len(obj_names), "object info files saved")
+        _LOGGER.info("%s object info files saved", len(obj_names))
 
     _write_json(Path(obj_info_folder) / "obj_aliases.json", obj_aliases)
-    write_stdout("object aliases saved successfully")
+    _LOGGER.info("object aliases saved successfully")
 
 
 def is_unlisted(ref: Path) -> bool:
@@ -559,15 +560,15 @@ def generate_stubs(
         stub_lines = _build_stub_lines(names_map, obj_infos)
         stub_path = objects_dir / f"{package}.py"
         stub_path.write_text("\n".join(stub_lines) + "\n")
-        write_stdout(
-            "stub module generated:",
-            f"objects/{package}.py",
-            f"({len(names_map)} objects)",
+        _LOGGER.info(
+            "stub module generated: objects/%s.py (%s objects)",
+            package,
+            len(names_map),
         )
 
     init_lines = _build_objects_init_lines(objects_dir)
     (objects_dir / "__init__.py").write_text("\n".join(init_lines) + "\n")
-    write_stdout("stub generation complete")
+    _LOGGER.info("stub generation complete")
 
 
 def _build_stub_lines(

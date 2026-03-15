@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from _pytest.capture import CaptureFixture
     from _pytest.monkeypatch import MonkeyPatch
 
 import pytest
@@ -129,9 +128,7 @@ def test_get_js_filename_returns_none_when_no_filename_arg() -> None:
     assert specialobjs.get_js_filename(obj) is None
 
 
-def test_get_js_io_reads_file_or_defaults(
-    tmp_path: Path, capsys: CaptureFixture[str]
-) -> None:
+def test_get_js_io_reads_file_or_defaults(tmp_path: Path, caplog: object) -> None:
     """Verify io markers fall back to defaults when missing."""
     js_file = tmp_path / "counts.js"
     js_file.write_text("inlets = 4; // comment\noutlets = 2;\n", encoding="utf-8")
@@ -144,12 +141,12 @@ def test_get_js_io_reads_file_or_defaults(
         "2",
     )
     assert specialobjs.get_js_io(obj, str(fallback_file), log_var="scan") == (1, 1)
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "defaults assumed (1 inlet, 1 outlet)" in output
 
 
 def test_update_js_from_file_updates_args_and_logs(
-    tmp_path: Path, capsys: CaptureFixture[str]
+    tmp_path: Path, caplog: object
 ) -> None:
     """Verify js inlet/outlet update mutates args and logs."""
     js_file = tmp_path / "counts.js"
@@ -162,11 +159,11 @@ def test_update_js_from_file_updates_args_and_logs(
     assert obj.__dict__["edit_calls"] == [
         {"text": f"7 5 {js_file}", "text_add": "replace"}
     ]
-    assert "7 outlets" in capsys.readouterr().out
+    assert "7 outlets" in caplog.text
 
 
 def test_create_js_reports_missing_filename_and_file(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify create_js handles missing filename and missing file cases."""
     no_name = DummySpecialObject(args=["1", "2"])
@@ -174,14 +171,14 @@ def test_create_js_reports_missing_filename_and_file(
     missing = DummySpecialObject(args=["1", "2", "missing"])
     specialobjs.create_js(missing, from_dict=False)
 
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "no filename specified" in output
     assert "missing.js not found" in output
     assert missing.__dict__["_ext_file"] is None
 
 
 def test_create_js_and_abstraction_update_state(
-    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+    tmp_path: Path, monkeypatch: MonkeyPatch, caplog: object
 ) -> None:
     """Verify create_js updates state for both raw and from-dict paths."""
     js_file = tmp_path / "script.js"
@@ -205,11 +202,11 @@ def test_create_js_and_abstraction_update_state(
         "script.js",
     ]
     assert from_dict_obj.__dict__["updated_text"] is True
-    assert "found, parsing for inlet/outlet numbers" in capsys.readouterr().out
+    assert "found, parsing for inlet/outlet numbers" in caplog.text
 
 
 def test_link_js_handles_no_filename_existing_and_missing_file(
-    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+    tmp_path: Path, monkeypatch: MonkeyPatch, caplog: object
 ) -> None:
     """Verify link_js reports missing and resolves present files."""
     js_file = tmp_path / "linked.js"
@@ -218,7 +215,7 @@ def test_link_js_handles_no_filename_existing_and_missing_file(
 
     no_filename = DummySpecialObject(filename="")
     specialobjs.link_js(no_filename)
-    assert "no filename specified" in capsys.readouterr().out
+    assert "no filename specified" in caplog.text
 
     linked = DummySpecialObject()
     specialobjs.link_js(linked, "linked.js")
@@ -227,18 +224,18 @@ def test_link_js_handles_no_filename_existing_and_missing_file(
 
     missing = DummySpecialObject()
     specialobjs.link_js(missing, "absent.js")
-    assert "absent.js not found" in capsys.readouterr().out
+    assert "absent.js not found" in caplog.text
 
 
 def test_create_abstraction_and_update_from_file_paths(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify abstraction creation and update paths."""
     from_dict_obj = DummySpecialObject(name="subpatch")
     specialobjs.create_abstraction(from_dict_obj, from_dict=True)
     assert from_dict_obj.__dict__["_ext_file"] == "subpatch.maxpat"
     assert from_dict_obj.__dict__["made_xlets"] is True
-    assert "abstraction created" in capsys.readouterr().out
+    assert "abstraction created" in caplog.text
 
     created = DummySpecialObject(name="explicit.maxpat")
     specialobjs.create_abstraction(
@@ -251,7 +248,7 @@ def test_create_abstraction_and_update_from_file_paths(
 
 
 def test_update_abstraction_from_file_builds_dict_and_logs(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify explicit update updates abstraction dict and xlet metadata."""
     obj = DummySpecialObject(name="subpatch")
@@ -271,7 +268,7 @@ def test_update_abstraction_from_file_builds_dict_and_logs(
         "attrib_info": [{"name": "COMMON"}],
     }
     assert obj.__dict__["made_xlets"] is True
-    assert "file found, abstraction created" in capsys.readouterr().out
+    assert "file found, abstraction created" in caplog.text
 
 
 def test_get_abstraction_io_counts_inlet_outlet_numbers(tmp_path: Path) -> None:
@@ -298,7 +295,7 @@ def test_get_abstraction_io_counts_inlet_outlet_numbers(tmp_path: Path) -> None:
 
 
 def test_link_abstraction_updates_obj_from_existing_or_reports_missing(
-    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+    tmp_path: Path, monkeypatch: MonkeyPatch, caplog: object
 ) -> None:
     """Verify link_abstraction resolves existing file and handles missing paths."""
     abstraction_file = tmp_path / "linked.maxpat"
@@ -319,11 +316,11 @@ def test_link_abstraction_updates_obj_from_existing_or_reports_missing(
 
     missing = DummySpecialObject(name="missing")
     specialobjs.link_abstraction(missing, "missing")
-    assert "missing.maxpat not found" in capsys.readouterr().out
+    assert "missing.maxpat not found" in caplog.text
 
 
 def test_create_abstraction_from_dict_reports_creation(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Ensure the dict-path abstraction creation logs and sets the ext file."""
     obj = MaxObject("custom")
@@ -331,7 +328,7 @@ def test_create_abstraction_from_dict_reports_creation(
     specialobjs.create_abstraction(obj, from_dict=True)
 
     assert obj.__dict__["_ext_file"] == "custom.maxpat"
-    assert "abstraction created" in capsys.readouterr().out
+    assert "abstraction created" in caplog.text
 
 
 def test_create_abstraction_requires_text_when_loading_from_specs() -> None:
@@ -346,7 +343,7 @@ def test_create_abstraction_requires_text_when_loading_from_specs() -> None:
 
 
 def test_create_declared_abstraction_applies_extra_attribs(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify declared abstractions accept extra attributes and sizes."""
     obj = MaxObject("declared")
@@ -358,7 +355,7 @@ def test_create_declared_abstraction_applies_extra_attribs(
     assert obj.__dict__["_dict"]["box"]["numinlets"] == _DECLARED_INLETS
     assert obj.__dict__["_dict"]["box"]["numoutlets"] == _DECLARED_OUTLETS
     assert obj.__dict__["_dict"]["box"]["text"] == "declared"
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "bgcolor requires 4 arguments" in output
     assert "bgcolor" not in obj.__dict__["_dict"]["box"]
 

@@ -1,8 +1,7 @@
 """Tests for save and serialization helpers."""
 
+import logging
 from pathlib import Path
-
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
 
@@ -29,17 +28,18 @@ def test_get_json_captures_boxes_and_patchcords() -> None:
 
 
 def test_save_writes_file_and_runs_check_when_verbose(
-    tmp_path: Path, capsys: CaptureFixture[str]
+    tmp_path: Path, caplog: object
 ) -> None:
     """Verify save writes file and runs patch check when verbose."""
     patch = MaxPatch(verbose=False)
     patch.place("definitely_unknown", verbose=False)
     save_path = tmp_path / "generated"
 
-    patch.save(str(save_path), verbose=True, check=True)
+    with caplog.at_level(logging.DEBUG, logger="maxpylang"):
+        patch.save(str(save_path), verbose=True, check=True)
     assert (tmp_path / "generated.maxpat").exists()
 
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "PatchCheck: unknown objects :" in output
     assert "maxpatch saved to" in output
 

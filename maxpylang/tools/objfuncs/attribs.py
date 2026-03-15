@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from maxpylang.tools import typechecks as tc
-from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 ObjectDict = dict[str, Any]
 AttribSpec = Mapping[str, Any]
 AttribSpecList = Sequence[AttribSpec]
+_LOGGER = logging.getLogger(__name__)
 
 
 def add_extra_attribs(self: MaxObject, extra_attribs: ObjectDict) -> None:
@@ -55,48 +56,40 @@ def remove_bad_attribs(
         vals = raw_vals if isinstance(raw_vals, list) else [raw_vals]
 
         if len(vals) == 0:
-            write_stdout(
-                "warning:",
+            _LOGGER.warning(
+                "warning: %s : no argument given for attribute %s",
                 self._name,
-                ": no argument given for attribute",
                 attrib,
             )
             continue
 
         matching_specs = [spec for spec in attrib_speclist if spec["name"] == attrib]
         if len(matching_specs) == 0:
-            write_stdout(
-                "Error:",
+            _LOGGER.error(
+                "Error: %s : %s is not a valid attribute argument",
                 self._name,
-                ":",
                 attrib,
-                "is not a valid attribute argument",
             )
             notvalid.add(attrib)
             continue
 
         attrib_spec = matching_specs[0]
         if len(vals) < int(attrib_spec["size"]):
-            write_stdout(
-                "Error:",
+            _LOGGER.error(
+                "Error: %s : %s requires %s arguments",
                 self._name,
-                ":",
                 attrib,
-                "requires",
                 attrib_spec["size"],
-                "arguments",
             )
             notvalid.add(attrib)
 
         if not all(
             tc.check_type([str(attrib_spec["type"])], single_val) for single_val in vals
         ):
-            write_stdout(
-                "Error:",
+            _LOGGER.error(
+                "Error: %s : %s requires arguments of type %s",
                 self._name,
-                ":",
                 attrib,
-                "requires arguments of type",
                 attrib_spec["type"],
             )
             notvalid.add(attrib)

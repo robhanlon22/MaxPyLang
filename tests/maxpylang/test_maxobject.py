@@ -2,10 +2,10 @@
 
 import copy
 import json
+import logging
 from pathlib import Path
 
 import pytest
-from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 
 from maxpylang import MaxObject
@@ -37,7 +37,7 @@ def _write_abstraction_file(
 
 
 def test_maxobject_user_methods_cover_known_and_unknown_paths(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Exercise known/unknown object paths and ensure expected user-facing output."""
     obj = MaxObject("cycle~ 440", color=[0.1, 0.2, 0.3, 0.4])
@@ -52,12 +52,13 @@ def test_maxobject_user_methods_cover_known_and_unknown_paths(
     assert obj.__dict__["_dict"]["box"]["patching_rect"][:2] == [12, 34]
 
     obj.edit(text="880 @fontsize 18", text_add="replace")
-    capsys.readouterr()
+    caplog.clear()
     assert obj.get_text() == "cycle~ 880 @fontsize 18"
     assert obj.inspect() is None
 
-    obj.debug()
-    debug_output = capsys.readouterr().out
+    with caplog.at_level(logging.DEBUG, logger="maxpylang"):
+        obj.debug()
+    debug_output = caplog.text
     assert "name cycle~" in debug_output
 
     with pytest.warns(UnknownObjectWarning, match="this_object_is_missing"):
@@ -65,12 +66,14 @@ def test_maxobject_user_methods_cover_known_and_unknown_paths(
     assert unknown.notknown() is True
     assert "this_object_is_missing" in repr(unknown)
 
+    caplog.clear()
     unknown.edit(text="1")
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "attempting edit on empty object" in output
 
+    caplog.clear()
     obj.link()
-    assert "cannot be linked to a file" in capsys.readouterr().out
+    assert "cannot be linked to a file" in caplog.text
 
 
 def test_maxobject_js_and_abstraction_paths(

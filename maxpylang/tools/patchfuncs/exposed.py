@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
     from maxpylang.maxpatch import MaxPatch
 
-
-def _write_stdout(*parts: object) -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+_LOGGER = logging.getLogger(__name__)
 
 
 def reorder(self: MaxPatch, *, verbose: bool = False) -> None:
     """Renumber patch objects sequentially."""
-    if verbose:
-        _write_stdout("reordering", self.num_objs, "objects...")
+    del verbose
+    _LOGGER.debug("reordering %s objects...", self.num_objs)
 
     self._num_objs = 0
     new_objs_dict: dict[str, MaxObject] = {}
@@ -28,8 +25,7 @@ def reorder(self: MaxPatch, *, verbose: bool = False) -> None:
         new_objs_dict[obj.box_id] = obj
     self._objs = new_objs_dict
 
-    if verbose:
-        _write_stdout(self.num_objs, "objects reordered")
+    _LOGGER.debug("%s objects reordered", self.num_objs)
 
 
 def set_position(
@@ -41,23 +37,23 @@ def set_position(
     verbose: bool = False,
 ) -> None:
     """Set the patch placement cursor."""
+    del verbose
     if isinstance(new_x, (float, int)) and isinstance(new_y, (float, int)):
         self._curr_position = [new_x, new_y]
-        if verbose:
-            if from_place:
-                _write_stdout("starting position set to", self._curr_position)
-            else:
-                _write_stdout("position set to", self._curr_position)
+        if from_place:
+            _LOGGER.debug("starting position set to %s", self._curr_position)
+        else:
+            _LOGGER.debug("position set to %s", self._curr_position)
         return
 
     if from_place:
-        _write_stdout(
+        _LOGGER.error(
             "Error: starting position must be specified as int or float, "
             "starting position not set"
         )
         return
 
-    _write_stdout("Error: position must be specified as int or float, position not set")
+    _LOGGER.error("Error: position must be specified as int or float, position not set")
 
 
 def replace(
@@ -71,7 +67,7 @@ def replace(
 ) -> None:
     """Replace one object with another and preserve compatible state."""
     if curr_obj_num not in self._objs:
-        _write_stdout(curr_obj_num, "does not exist, nothing changed")
+        _LOGGER.warning("%s does not exist, nothing changed", curr_obj_num)
         return
 
     old_obj = self._objs[curr_obj_num]
@@ -95,8 +91,7 @@ def replace(
         replace_id=curr_obj_num,
     )
 
-    if verbose:
-        _write_stdout(old_name, "replaced, new", curr_obj_num, ":", replacement.name)
+    _LOGGER.debug("%s replaced, new %s : %s", old_name, curr_obj_num, replacement.name)
 
 
 def inspect(self: MaxPatch, *objs: str, info: str = "all") -> None:

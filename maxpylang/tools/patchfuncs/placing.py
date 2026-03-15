@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
-import sys
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Union, cast
 
@@ -35,6 +35,7 @@ _LEGACY_PLACE_PICK_ARGS = ("randpick", "num_objs", "seed", "weights", "verbose")
 _LEGACY_PLACE_OBJECT_ARGS = ("verbose", "replace_id")
 _DEFAULT_SPACING: Position = [80.0, 80.0]
 _DEFAULT_POSITION: Position = [0.0, 0.0]
+_LOGGER = logging.getLogger(__name__)
 
 
 def _assertion_error(message: str) -> AssertionError:
@@ -45,11 +46,6 @@ def _assertion_error(message: str) -> AssertionError:
 def _type_error(message: str) -> TypeError:
     """Build a `TypeError` instance."""
     return TypeError(message)
-
-
-def _write_stdout(*parts: object, end: str = "\n") -> None:
-    """Write a space-joined message to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + end)
 
 
 def _bool_option(
@@ -136,9 +132,9 @@ def _normalize_random_counts(
     """Validate count and weight options for random picking."""
     normalized = num_objs
     if isinstance(normalized, list):
-        _write_stdout(
-            "warning: randpick only uses the first element of num_objs "
-            "to determine the number of objects picked"
+        _LOGGER.warning(
+            "warning: randpick only uses the first element of num_objs to "
+            "determine the number of objects picked"
         )
         normalized = int(normalized[0])
     if weights is not None and len(weights) != len(objs):
@@ -230,9 +226,9 @@ def _normalize_starting_pos(starting_pos: Position | None) -> Position | None:
         return None
     if isinstance(starting_pos, (list, tuple)) and len(starting_pos) == _POSITION_SIZE:
         return starting_pos
-    _write_stdout(
-        " PatchError: starting position must be [x, y] list or tuple "
-        "of length 2, starting position not set"
+    _LOGGER.error(
+        "PatchError: starting position must be [x, y] list or tuple of length 2, "
+        "starting position not set"
     )
     return None
 
@@ -354,19 +350,17 @@ def place_pick_objs(
     num_objs = cast("CountSpec", options.pop("num_objs", 1))
     seed = _optional_int_option(options, "seed")
     weights = cast("list[float] | None", options.pop("weights", None))
-    verbose = _bool_option(options, "verbose", default=False)
+    _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
 
     if randpick:
         random_seed = _random_seed() if seed is None else seed
         rng = np.random.default_rng(random_seed)
-        if verbose:
-            _write_stdout(
-                "Patcher: picking",
-                num_objs,
-                "random objects with seed",
-                random_seed,
-            )
+        _LOGGER.debug(
+            "Patcher: picking %s random objects with seed %s",
+            num_objs,
+            random_seed,
+        )
         if not isinstance(num_objs, (int, float)):
             message = "randpick requires a numeric num_objs value"
             raise _assertion_error(message)
@@ -397,13 +391,11 @@ def place_grid(
     """Place objects on a grid."""
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
-    if verbose:
-        _write_stdout(
-            "Patcher: placing",
-            len(objs),
-            "objects with grid spacings of",
-            spacing,
-        )
+    _LOGGER.debug(
+        "Patcher: placing %s objects with grid spacings of %s",
+        len(objs),
+        spacing,
+    )
 
     x_space = float(spacing[0])
     y_space = float(spacing[1])
@@ -437,8 +429,7 @@ def place_random(
     """Place objects at random patcher positions."""
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
-    if verbose:
-        _write_stdout("Patcher: placing", len(objs), "objects randomly with seed", seed)
+    _LOGGER.debug("Patcher: placing %s objects randomly with seed %s", len(objs), seed)
 
     rng = np.random.default_rng(seed)
     width = float(self._patcher_dict["patcher"]["rect"][2])
@@ -460,13 +451,11 @@ def place_custom(
     """Place objects at explicit positions."""
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
-    if verbose:
-        _write_stdout(
-            "Patcher: placing",
-            len(objs),
-            "objects with custom positions of",
-            positions,
-        )
+    _LOGGER.debug(
+        "Patcher: placing %s objects with custom positions of %s",
+        len(objs),
+        positions,
+    )
 
     created_objs: list[MaxObject] = []
     current_position: Position = [self._curr_position[0], self._curr_position[1]]
@@ -488,13 +477,11 @@ def place_vertical(
     """Place objects vertically."""
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
-    if verbose:
-        _write_stdout(
-            "Patcher: placing",
-            len(objs),
-            "objects with vertical spacing of",
-            spacing,
-        )
+    _LOGGER.debug(
+        "Patcher: placing %s objects with vertical spacing of %s",
+        len(objs),
+        spacing,
+    )
 
     x_pos = self._curr_position[0] + spacing
     y_pos = self._curr_position[1]
@@ -518,7 +505,7 @@ def place_obj(
 ) -> MaxObject:
     """Place one object into the patch."""
     _apply_legacy_args(options, args, _LEGACY_PLACE_OBJECT_ARGS, "place_obj")
-    verbose = _bool_option(options, "verbose", default=False)
+    _bool_option(options, "verbose", default=False)
     replace_id = cast("str | None", options.pop("replace_id", None))
     _assert_no_options(options)
 
@@ -532,11 +519,11 @@ def place_obj(
     placed_obj.raw_dict["box"]["patching_rect"][0:2] = position
     self._objs[placed_obj.box_id] = placed_obj
 
-    if verbose:
-        _write_stdout("Patcher:", placed_obj.name, end="")
-        if placed_obj.notknown():
-            _write_stdout(" (unknown)", end="")
-        _write_stdout(" added, total objects", self._num_objs)
+    message = f"Patcher: {placed_obj.name}"
+    if placed_obj.notknown():
+        message += " (unknown)"
+    message += f" added, total objects {self._num_objs}"
+    _LOGGER.debug(message)
 
     return placed_obj
 

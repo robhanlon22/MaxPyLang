@@ -1,7 +1,6 @@
 """Tests for objfuncs.makexlets helpers."""
 
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxObject
 from maxpylang.tools.objfuncs.makexlets import _parse_comparator
@@ -106,7 +105,7 @@ def test_parse_io_typing_handles_default_and_dict_rules() -> None:
 
 
 def test_update_ins_outs_cleans_removed_xlets_and_connections(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify removed xlets and their cord references are cleaned."""
     obj = MaxObject("button")
@@ -125,7 +124,7 @@ def test_update_ins_outs_cleans_removed_xlets_and_connections(
         default_info={},
     )
     assert obj.outs == []
-    assert "Patchcord removed" in capsys.readouterr().out
+    assert "Patchcord removed" in caplog.text
 
 
 def test_xlet_add_remove_updates_counts_and_parsing() -> None:
@@ -158,7 +157,7 @@ def test_xlet_add_remove_updates_counts_and_parsing() -> None:
 
 
 def test_remove_xlets_detaches_sources_from_removed_inlets(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify removing inlets detaches attached source connections."""
     source = MaxObject("button")
@@ -175,7 +174,7 @@ def test_remove_xlets_detaches_sources_from_removed_inlets(
     target.remove_xlets(1, "numinlets")
 
     assert source.outs[0].destinations == []
-    assert "Patchcord removed" in capsys.readouterr().out
+    assert "Patchcord removed" in caplog.text
 
 
 def test_update_ins_outs_updates_vst_save_state() -> None:

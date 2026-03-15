@@ -22,7 +22,6 @@ from maxpylang.importobjs import (
 )
 
 if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
     from _pytest.monkeypatch import MonkeyPatch
 
 
@@ -114,7 +113,7 @@ def test_get_package_paths_expands_vanilla_and_custom_packages(
 
 
 def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
-    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+    monkeypatch: MonkeyPatch, tmp_path: Path, caplog: object
 ) -> None:
     """Verify folder creation handles missing, skipped, and overwritten cases."""
     obj_info_root = tmp_path / "OBJ_INFO"
@@ -146,7 +145,7 @@ def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
     }
     assert not (overwritten_info / "old.json").exists()
     assert (obj_info_root / "brand-new").exists()
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "package missing not found" in output
     assert "prepping to re-import skipme" in output
     assert "prepping to re-import replace-me" in output
@@ -154,7 +153,7 @@ def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
 
 
 def test_prep_make_info_folders_skips_existing_when_not_overwriting(
-    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+    monkeypatch: MonkeyPatch, tmp_path: Path, caplog: object
 ) -> None:
     """Verify existing folders are skipped when overwrite is disabled."""
     obj_info_root = tmp_path / "OBJ_INFO"
@@ -170,7 +169,7 @@ def test_prep_make_info_folders_skips_existing_when_not_overwriting(
     )
 
     assert result == {}
-    assert "pkg previously imported, skipping..." in capsys.readouterr().out
+    assert "pkg previously imported, skipping..." in caplog.text
 
 
 def test_is_unlisted_and_get_obj_aliases_handle_category_and_missing_text(
@@ -381,7 +380,7 @@ def test_get_objattrib_info_and_get_objinout_info_cover_ui_non_ui_and_missing_io
 
 
 def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
-    tmp_path: Path, monkeypatch: MonkeyPatch, capsys: CaptureFixture[str]
+    tmp_path: Path, monkeypatch: MonkeyPatch, caplog: object
 ) -> None:
     """Verify unlisted objects are skipped and aliases are persisted."""
     obj_info_root = tmp_path / "OBJ_INFO"
@@ -441,7 +440,7 @@ def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
         (obj_info_root / "obj_aliases.json").read_text(encoding="utf-8")
     )
     assert aliases == {"t": "trigger", "alias-alpha": "alpha"}
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "importing demo objects..." in output
     assert "1 object info files saved" in output
     assert "object aliases saved successfully" in output
@@ -599,7 +598,7 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
 def test_importobjs_doc_helpers_and_doc_info(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify doc helpers produce expected metadata and public stub generation text."""
     rich_ref = tmp_path / "rich.maxref.xml"
@@ -725,7 +724,7 @@ def test_importobjs_doc_helpers_and_doc_info(
     objects_dir = fake_module.parent / "objects"
     stub_text = (objects_dir / "demo.py").read_text(encoding="utf-8")
     init_text = (objects_dir / "__init__.py").read_text(encoding="utf-8")
-    output = capsys.readouterr().out
+    output = caplog.text
 
     assert "stub module generated: objects/demo.py (2 objects)" in output
     assert "stub generation complete" in output
@@ -862,7 +861,7 @@ def test_build_objects_init_lines_skips_dunder_init_modules(tmp_path: Path) -> N
 
 
 def test_importobjs_doc_and_stub_helpers(
-    monkeypatch: MonkeyPatch, tmp_path: Path, capsys: CaptureFixture[str]
+    monkeypatch: MonkeyPatch, tmp_path: Path, caplog: object
 ) -> None:
     """Verify generated module stubs and exports include object metadata."""
     info_root = tmp_path / "info"
@@ -915,7 +914,7 @@ def test_importobjs_doc_and_stub_helpers(
     objects_dir = fake_module.parent / "objects"
     stub_text = (objects_dir / "demo.py").read_text(encoding="utf-8")
     init_text = (objects_dir / "__init__.py").read_text(encoding="utf-8")
-    output = capsys.readouterr().out
+    output = caplog.text
 
     assert "stub module generated: objects/demo.py (3 objects)" in output
     assert "stub generation complete" in output

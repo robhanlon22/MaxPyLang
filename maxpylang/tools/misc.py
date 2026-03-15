@@ -1,14 +1,10 @@
 """Miscellaneous helper functions."""
 
-import sys
+from __future__ import annotations
+
 from pathlib import Path
 
 from maxpylang.tools.constants import obj_info_folder
-
-
-def write_stdout(*parts: object) -> None:
-    """Write a single line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
 
 
 def get_objs() -> dict[str, list[str]]:

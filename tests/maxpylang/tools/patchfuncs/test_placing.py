@@ -1,7 +1,6 @@
 """Tests for patch object placement helpers."""
 
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxObject, MaxPatch
 from maxpylang.exceptions import UnknownObjectWarning
@@ -20,7 +19,7 @@ _FOUR_OBJECTS = 4
 _DEFAULT_GRID_OBJECT_COUNT = 3
 
 
-def test_place_check_args_rejects_invalid_inputs(capsys: CaptureFixture[str]) -> None:
+def test_place_check_args_rejects_invalid_inputs(caplog: object) -> None:
     """Reject malformed placement argument combinations."""
     patch = MaxPatch(verbose=False)
 
@@ -70,12 +69,10 @@ def test_place_check_args_rejects_invalid_inputs(capsys: CaptureFixture[str]) ->
     )
     assert num_objs == _DEFAULT_RANDOM_OBJECT_COUNT
     assert starting_pos is None
-    assert "starting position must be [x, y]" in capsys.readouterr().out
+    assert "starting position must be [x, y]" in caplog.text
 
 
-def test_place_check_args_handles_seeded_random_warning(
-    capsys: CaptureFixture[str],
-) -> None:
+def test_place_check_args_handles_seeded_random_warning(caplog: object) -> None:
     """Report seeded random limitation when a list of counts is provided."""
     patch = MaxPatch(verbose=False)
     num_objs, _ = patch.place_check_args(
@@ -91,7 +88,7 @@ def test_place_check_args_handles_seeded_random_warning(
     assert num_objs == _DEFAULT_RANDOM_OBJECT_COUNT
     assert (
         "warning: randpick only uses the first element of num_objs to determine "
-        "the number of objects picked" in capsys.readouterr().out
+        "the number of objects picked" in caplog.text
     )
 
 

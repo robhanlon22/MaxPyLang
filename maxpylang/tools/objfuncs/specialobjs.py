@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from maxpylang.tools import constants as _constants
 from maxpylang.tools import typechecks as tc
-from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _strip_assignment_value(line: str) -> str:
@@ -27,7 +29,7 @@ def create_js(self: MaxObject, *, from_dict: bool | None = None) -> None:
     if not from_dict:
         filename = self.get_js_filename()
         if filename is None:
-            write_stdout("no filename specified")
+            _LOGGER.error("no filename specified")
             return
         self._dict["box"]["saved_object_attributes"]["filename"] = filename
     else:
@@ -37,12 +39,12 @@ def create_js(self: MaxObject, *, from_dict: bool | None = None) -> None:
     if js_path.exists():
         self._ext_file = str(js_path.resolve())
     elif not from_dict:
-        write_stdout(f"{filename} not found")
+        _LOGGER.error("%s not found", filename)
         return
 
     if from_dict:
         if js_path.exists():
-            write_stdout(f"{filename} found, parsing for inlet/outlet numbers")
+            _LOGGER.info("%s found, parsing for inlet/outlet numbers", filename)
         numinlets = self._dict["box"]["numinlets"]
         numoutlets = self._dict["box"]["numoutlets"]
         self._args = [numinlets, numoutlets, filename]
@@ -65,15 +67,12 @@ def update_js_from_file(
     self.edit(text=" ".join(new_args_string), text_add="replace")
 
     if log_var is not None:
-        write_stdout(
+        _LOGGER.info(
+            "%s : %s updated to %s inlets and %s outlets",
             log_var,
-            ":",
             filename,
-            "updated to",
             numinlets,
-            "inlets and",
             numoutlets,
-            "outlets",
         )
 
 
@@ -101,11 +100,10 @@ def get_js_io(
         numinlets = 1
         numoutlets = 1
         if log_var is not None:
-            write_stdout(
+            _LOGGER.warning(
+                "%s : %s defaults assumed (1 inlet, 1 outlet)",
                 log_var,
-                ":",
                 filename,
-                "defaults assumed (1 inlet, 1 outlet)",
             )
 
     return numinlets, numoutlets
@@ -128,12 +126,12 @@ def link_js(self: MaxObject, link_file: str | None = None) -> None:
     if link_file is None:
         link_file = str(self._dict["box"]["saved_object_attributes"]["filename"])
         if link_file == "":
-            write_stdout("no filename specified")
+            _LOGGER.error("no filename specified")
             return
 
     js_path = Path(link_file)
     if not js_path.exists():
-        write_stdout(f"{link_file} not found")
+        _LOGGER.error("%s not found", link_file)
         return
 
     self._ext_file = str(js_path.resolve())
@@ -154,7 +152,7 @@ def create_abstraction(
 
     if from_dict:
         self.make_xlets_from_self_dict()
-        write_stdout("abstraction created")
+        _LOGGER.info("abstraction created")
         return
 
     if text is None:
@@ -192,7 +190,7 @@ def update_abstraction_from_file(
     self.make_xlets_from_self_dict()
 
     if log_var is not None:
-        write_stdout(log_var, ": file found, abstraction created")
+        _LOGGER.info("%s : file found, abstraction created", log_var)
 
 
 def create_declared_abstraction(
@@ -254,7 +252,7 @@ def link_abstraction(self: MaxObject, link_file: str | None = None) -> None:
 
     abstraction_path = Path(link_file)
     if not abstraction_path.exists():
-        write_stdout(f"{link_file} not found")
+        _LOGGER.error("%s not found", link_file)
         return
 
     self._ref_file = "abstraction"

@@ -2,17 +2,17 @@
 
 import copy
 import json
+import logging
 from pathlib import Path
 
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
 
 _RELOADED_OBJECT_COUNT = 2
 
 
-def test_load_template_from_path(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
+def test_load_template_from_path(tmp_path: Path, caplog: object) -> None:
     """Verify a template file is loaded and applied to the patch."""
     template_dir = tmp_path / "templates"
     template_dir.mkdir()
@@ -24,12 +24,10 @@ def test_load_template_from_path(tmp_path: Path, capsys: CaptureFixture[str]) ->
 
     patch = MaxPatch(verbose=False)
     patch.patch_templates_path = str(template_dir)
-    patch.load_template("simple.json", verbose=True)
+    with caplog.at_level(logging.DEBUG, logger="maxpylang"):
+        patch.load_template("simple.json", verbose=True)
     assert patch.__dict__["_patcher_dict"]["patcher"]["rect"] == [0, 0, 100, 100]
-    assert (
-        "Patcher: new patch created from template file: simple.json"
-        in capsys.readouterr().out
-    )
+    assert "Patcher: new patch created from template file: simple.json" in caplog.text
 
 
 def test_load_objs_and_cords_from_dict() -> None:

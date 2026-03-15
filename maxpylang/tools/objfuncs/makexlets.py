@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import operator
 from typing import TYPE_CHECKING, Any, cast
 
 from maxpylang.tools import typechecks as tc
-from maxpylang.tools.misc import write_stdout
 from maxpylang.xlet import Inlet, Outlet
 
 if TYPE_CHECKING:
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 ObjectInfo = dict[str, Any]
 Comparator = dict[str, Any]
+_LOGGER = logging.getLogger(__name__)
 _COMPARATORS = {
     "<": operator.lt,
     "<=": operator.le,
@@ -143,7 +144,7 @@ def remove_xlets(self: MaxObject, num: int, xlet_type: str) -> None:
                 inlet.sources.remove(outlet)
                 if inlet in outlet.destinations:
                     outlet.destinations.remove(inlet)
-                write_stdout("Patchcord removed")
+                _LOGGER.info("%s", "Patchcord removed")
         return
 
     removed_outlets = self._outs[-num:]
@@ -156,7 +157,7 @@ def remove_xlets(self: MaxObject, num: int, xlet_type: str) -> None:
             inlet.sources.remove(outlet)
             if inlet in outlet.destinations:
                 outlet.destinations.remove(inlet)
-            write_stdout("Patchcord removed")
+            _LOGGER.info("%s", "Patchcord removed")
 
 
 def update_dict_io_nums(self: MaxObject) -> None:

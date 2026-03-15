@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import sys
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -13,11 +13,7 @@ if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
 JSONDict = dict[str, Any]
-
-
-def _write_stdout(*parts: object) -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+_LOGGER = logging.getLogger(__name__)
 
 
 def _read_json_dict(path: Path) -> JSONDict:
@@ -32,6 +28,7 @@ def load_template(
     verbose: bool = True,
 ) -> None:
     """Load a patch template into the patch instance."""
+    del verbose
     template_path = Path(template)
     if not template_path.exists():
         template_path = Path(self.patch_templates_path) / template
@@ -40,11 +37,10 @@ def load_template(
             raise AssertionError(message)
 
     self._patcher_dict = _read_json_dict(template_path)
-    if verbose:
-        _write_stdout(
-            "Patcher: new patch created from template file:",
-            template_path.name,
-        )
+    _LOGGER.debug(
+        "Patcher: new patch created from template file: %s",
+        template_path.name,
+    )
 
 
 def load_file(
@@ -56,8 +52,7 @@ def load_file(
 ) -> None:
     """Load an existing `.maxpat` file into the patch instance."""
     input_path = Path(filename)
-    if verbose:
-        _write_stdout("Patcher: loading patch from existing file:", input_path.name)
+    _LOGGER.debug("Patcher: loading patch from existing file: %s", input_path.name)
 
     patch_dict = _read_json_dict(input_path)
     self.load_objs_from_dict(patch_dict, verbose=verbose)
@@ -66,8 +61,7 @@ def load_file(
 
     if reorder:
         self.reorder()
-    if verbose:
-        _write_stdout("Patcher: patch loaded from existing file:", input_path.name)
+    _LOGGER.debug("Patcher: patch loaded from existing file: %s", input_path.name)
 
 
 def load_objs_from_dict(
@@ -77,14 +71,14 @@ def load_objs_from_dict(
     verbose: bool = True,
 ) -> None:
     """Load box objects from a serialized patch dictionary."""
+    del verbose
     self._num_objs = 0
     patcher = cast("dict[str, Any]", patch_dict["patcher"])
     for box in cast("list[Any]", patcher["boxes"]):
         obj = MaxObject(box, from_dict=True)
         self._num_objs += 1
         self._objs[obj.box_id] = obj
-        if verbose:
-            _write_stdout("Patcher:", obj.name, "added, total objects", self._num_objs)
+        _LOGGER.debug("Patcher: %s added, total objects %s", obj.name, self._num_objs)
 
 
 def load_patchcords_from_dict(

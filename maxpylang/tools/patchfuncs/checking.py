@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 PatchObject = Any
 PatchObjectMap = dict[str, PatchObject]
+_LOGGER = logging.getLogger(__name__)
 
 _UNKNOWN_HEADER = "PatchCheck: unknown objects :"
 _UNLINKED_JS_HEADER = "PatchCheck: unlinked js objects :"
@@ -20,11 +21,6 @@ _LINKED_JS_HEADER = (
 _ABSTRACTION_HEADER = (
     "PatchCheck: linked abstractions (files must be in same folder as patch file):"
 )
-
-
-def _write_stdout(*parts: object, end: str = "\n") -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + end)
 
 
 def _object_name(obj: PatchObject) -> str:
@@ -45,7 +41,7 @@ def _object_ext_file(obj: PatchObject) -> str | None:
 def _emit_object_lines(objects: PatchObjectMap) -> None:
     """Emit one line per labeled object."""
     for label, obj in objects.items():
-        _write_stdout("              ", label, ":", obj)
+        _LOGGER.info("              %s : %s", label, obj)
 
 
 def _emit_linked_lines(objects: PatchObjectMap) -> None:
@@ -53,7 +49,7 @@ def _emit_linked_lines(objects: PatchObjectMap) -> None:
     for label, obj in objects.items():
         ext_file = _object_ext_file(obj)
         linked_name = "" if ext_file is None else Path(ext_file).name
-        _write_stdout("              ", label, ":", obj, "-->", linked_name)
+        _LOGGER.info("              %s : %s --> %s", label, obj, linked_name)
 
 
 def check(self: MaxPatch, *flags: str) -> None:
@@ -65,36 +61,32 @@ def check(self: MaxPatch, *flags: str) -> None:
     if "unknown" in flag_list or "unknowns" in flag_list:
         unknown_objs = self.get_unknowns()
         if unknown_objs:
-            _write_stdout(_UNKNOWN_HEADER)
+            _LOGGER.info(_UNKNOWN_HEADER)
             _emit_object_lines(unknown_objs)
         else:
-            _write_stdout(f"{_UNKNOWN_HEADER} no unknown objects")
-        _write_stdout()
+            _LOGGER.info("%s no unknown objects", _UNKNOWN_HEADER)
 
     if "js" in flag_list:
         linked_js, unlinked_js = self.get_js_objs()
         if unlinked_js:
-            _write_stdout(_UNLINKED_JS_HEADER)
+            _LOGGER.info(_UNLINKED_JS_HEADER)
             _emit_object_lines(unlinked_js)
         else:
-            _write_stdout(f"{_UNLINKED_JS_HEADER} no unlinked js objects")
-        _write_stdout()
+            _LOGGER.info("%s no unlinked js objects", _UNLINKED_JS_HEADER)
 
         if linked_js:
-            _write_stdout(_LINKED_JS_HEADER)
+            _LOGGER.info(_LINKED_JS_HEADER)
             _emit_linked_lines(linked_js)
         else:
-            _write_stdout(f"{_LINKED_JS_HEADER} no linked js objects")
-        _write_stdout()
+            _LOGGER.info("%s no linked js objects", _LINKED_JS_HEADER)
 
     if "abstractions" in flag_list or "abstraction" in flag_list:
         abstractions = self.get_abstractions()
         if abstractions:
-            _write_stdout(_ABSTRACTION_HEADER)
+            _LOGGER.info(_ABSTRACTION_HEADER)
             _emit_linked_lines(abstractions)
         else:
-            _write_stdout(f"{_ABSTRACTION_HEADER} no linked abstractions")
-        _write_stdout()
+            _LOGGER.info("%s no linked abstractions", _ABSTRACTION_HEADER)
 
 
 def get_unknowns(self: MaxPatch) -> PatchObjectMap:

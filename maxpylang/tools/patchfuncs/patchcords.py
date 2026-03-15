@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from maxpylang.xlet import Inlet, Outlet
@@ -13,16 +13,12 @@ if TYPE_CHECKING:
 
 Connection = list[Any]
 _CONNECTION_WITH_MIDPOINTS = 3
+_LOGGER = logging.getLogger(__name__)
 
 
 def _assertion_error(message: str) -> AssertionError:
     """Build an `AssertionError` instance."""
     return AssertionError(message)
-
-
-def _write_stdout(*parts: object) -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
 
 
 def connect(
@@ -31,6 +27,7 @@ def connect(
     verbose: bool = True,
 ) -> None:
     """Create patchcords between outlets and inlets."""
+    del verbose
     self.check_connection_format(connections)
     valid_connections = self.check_connection_typing(connections)
 
@@ -43,19 +40,13 @@ def connect(
 
         inlet.add_source(outlet, midpoints)
         outlet.add_destination(inlet)
-
-        if verbose:
-            _write_stdout(
-                "Patcher: connected: (",
-                outlet.parent.name,
-                ": outlet",
-                outlet.index,
-                "--->",
-                inlet.parent.name,
-                ": inlet",
-                inlet.index,
-                ")",
-            )
+        _LOGGER.debug(
+            "Patcher: connected: ( %s : outlet %s ---> %s : inlet %s )",
+            outlet.parent.name,
+            outlet.index,
+            inlet.parent.name,
+            inlet.index,
+        )
 
 
 def swap_patchcords(self: MaxPatch, new: MaxObject, old: MaxObject) -> None:
@@ -125,14 +116,11 @@ def check_connection_exists(
         if inlet in outlet.destinations and outlet in inlet.sources:
             existing_connections.append(connection)
             continue
-        _write_stdout(
-            "PatchError:",
+        _LOGGER.error(
+            "PatchError: %s : outlet %s not connected to %s : inlet %s",
             outlet.parent.name,
-            ": outlet",
             outlet.index,
-            "not connected to",
             inlet.parent.name,
-            ": inlet",
             inlet.index,
         )
     return existing_connections

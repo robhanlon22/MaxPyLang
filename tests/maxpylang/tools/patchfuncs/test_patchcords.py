@@ -1,7 +1,6 @@
 """Tests for patch cord operations."""
 
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxObject, MaxPatch
 
@@ -39,7 +38,7 @@ def test_check_connection_format_and_typing() -> None:
 
 
 def test_check_connection_exists_reports_existing_and_missing(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify checks distinguish missing and existing connections."""
     patch = MaxPatch(verbose=False)
@@ -48,7 +47,7 @@ def test_check_connection_exists_reports_existing_and_missing(
     missing = [source.outs[0], destination.ins[0]]
 
     assert patch.check_connection_exists([missing]) == []
-    assert "PatchError:" in capsys.readouterr().out
+    assert "PatchError:" in caplog.text
 
     patch.connect([source.outs[0], destination.ins[0]], verbose=False)
     assert patch.check_connection_exists([missing]) == [missing]

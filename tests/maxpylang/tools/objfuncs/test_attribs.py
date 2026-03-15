@@ -2,8 +2,6 @@
 
 from types import SimpleNamespace
 
-from _pytest.capture import CaptureFixture
-
 from maxpylang import MaxObject
 
 
@@ -16,7 +14,7 @@ def test_add_and_get_extra_attribs() -> None:
 
 
 def test_remove_bad_attribs_filtering_and_messages(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify invalid attribute values are dropped and diagnostic text is shown."""
     obj = MaxObject("message")
@@ -36,7 +34,7 @@ def test_remove_bad_attribs_filtering_and_messages(
         ],
     )
     assert cleaned == {"fontsize": 12, "empty": []}
-    attrib_output = capsys.readouterr().out
+    attrib_output = caplog.text
     assert "not a valid attribute argument" in attrib_output
     assert "requires 4 arguments" in attrib_output
     assert "requires arguments of type float" in attrib_output

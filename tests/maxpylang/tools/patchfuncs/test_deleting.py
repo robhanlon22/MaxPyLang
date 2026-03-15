@@ -1,7 +1,8 @@
 """Tests for patch deletion helpers."""
 
+import logging
+
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
 
@@ -23,7 +24,7 @@ def test_delete_get_extra_cords_collects_attached_connections() -> None:
 
 
 def test_delete_objs_remove_objects_and_report_missing(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify remove by id handles both present and missing entries."""
     patch = MaxPatch(verbose=False)
@@ -38,11 +39,11 @@ def test_delete_objs_remove_objects_and_report_missing(
     assert patch.num_objs == 1
 
     patch.delete_objs("not-found", verbose=True)
-    assert "delete error: not-found not in patch" in capsys.readouterr().out
+    assert "delete error: not-found not in patch" in caplog.text
 
 
 def test_delete_cords_updates_connections_and_silently_skips_missing(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify deleting cords drops endpoints and handles missing ones safely."""
     patch = MaxPatch(verbose=False)
@@ -50,14 +51,15 @@ def test_delete_cords_updates_connections_and_silently_skips_missing(
     destination = patch.place("number", verbose=False)[0]
     patch.connect([source.outs[0], destination.ins[0], [1.0, 2.0]], verbose=False)
 
-    patch.delete_cords([source.outs[0], destination.ins[0]], verbose=True)
+    with caplog.at_level(logging.DEBUG, logger="maxpylang"):
+        patch.delete_cords([source.outs[0], destination.ins[0]], verbose=True)
     assert destination.ins[0].sources == []
     assert source.outs[0].destinations == []
-    assert "disconnected:" in capsys.readouterr().out
+    assert "disconnected:" in caplog.text
 
 
 def test_delete_removes_attachments_and_objects_in_one_call(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify combined object/cord deletion keeps structure consistent."""
     patch = MaxPatch(verbose=False)
@@ -70,7 +72,7 @@ def test_delete_removes_attachments_and_objects_in_one_call(
         cords=[[source.outs[0], target.ins[0]]],
         verbose=True,
     )
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "delete error: not-in-patch not in patch" in output
     assert target.ins[0].sources == []
     assert source.__dict__["_dict"]["box"]["id"] in patch.objs

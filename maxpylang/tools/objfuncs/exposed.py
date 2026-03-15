@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
-
-from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
 ObjectDict = dict[str, Any]
+_LOGGER = logging.getLogger(__name__)
 
 
 def move(self: MaxObject, x: float, y: float) -> None:
@@ -26,8 +26,8 @@ def edit(
 ) -> None:
     """Edit object text and attributes without changing the object class."""
     if self.notknown():
-        write_stdout("Error: attempting edit on empty object")
-        write_stdout("       nothing edited")
+        _LOGGER.error("Error: attempting edit on empty object")
+        _LOGGER.warning("       nothing edited")
         return
 
     new_args: list[Any] = []
@@ -50,19 +50,18 @@ def edit(
         attrib_info = [{"name": "COMMON"}]
         _, extra_attribs = self.get_all_valid_attribs({}, extra_attribs, attrib_info)
         self.add_extra_attribs(extra_attribs)
-        write_stdout(
-            "ObjectWarning:",
+        _LOGGER.warning(
+            "ObjectWarning: %s : edit : abstraction edited naively. if abstraction "
+            "args affect inlets/outlets or abstraction has unique attributes, "
+            "abstraction info must be imported using import_objs() function to "
+            "reflect arg/attribute behaviors.",
             self.name,
-            ": edit : abstraction edited naively. if abstraction args affect"
-            " inlets/outlets or abstraction has unique attributes, abstraction info"
-            " must be imported using import_objs() function to reflect"
-            " arg/attribute behaviors.",
         )
         return
 
     info = self.get_info()
     if not self.args_valid(self.name, new_args, info["args"]):
-        write_stdout(self.name, "not edited")
+        _LOGGER.warning("%s not edited", self.name)
         return
     self._args = new_args
 
@@ -85,7 +84,7 @@ def link(self: MaxObject, link_file: str | None = None) -> None:
         or self._ref_file == "abstraction"
         or allow_unknown_as_abstraction
     ):
-        write_stdout("ObjectError:", self.name, ": link : cannot be linked to a file")
+        _LOGGER.error("ObjectError: %s : link : cannot be linked to a file", self.name)
         return
 
     if self.name == "js":

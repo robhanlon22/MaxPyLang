@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-from _pytest.capture import CaptureFixture
 from _pytest.monkeypatch import MonkeyPatch
 
 from maxpylang import MaxObject
@@ -19,24 +18,24 @@ def test_move_updates_patch_position() -> None:
 
 
 def test_link_restricts_to_js_and_abstractions(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify standard UI objects cannot be linked."""
     obj = MaxObject("toggle")
     obj.link()
-    assert "cannot be linked to a file" in capsys.readouterr().out
+    assert "cannot be linked to a file" in caplog.text
 
 
-def test_edit_noop_for_unknown_objects(capsys: CaptureFixture[str]) -> None:
+def test_edit_noop_for_unknown_objects(caplog: object) -> None:
     """Verify unknown objects still collect a no-op warning path."""
     with pytest.warns(UnknownObjectWarning, match="does_not_exist"):
         unknown = MaxObject("does_not_exist")
     unknown.edit(text="42")
-    assert "attempting edit on empty object" in capsys.readouterr().out
+    assert "attempting edit on empty object" in caplog.text
 
 
 def test_edit_obeys_args_validation_and_returns_for_invalid_input(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify invalid args abort edit with warning and no mutation."""
 
@@ -51,26 +50,22 @@ def test_edit_obeys_args_validation_and_returns_for_invalid_input(
         def notknown(self) -> bool:
             return False
 
-        def parse_text(
-            self, _text: str
-        ) -> tuple[str, list[int], dict[str, list[str]]]:
+        def parse_text(self, _text: str) -> tuple[str, list[int], dict[str, list[str]]]:
             return "demo", [1], {}
 
         def get_info(self, _text: str = "") -> dict:
             return {"args": {}, "attribs": [], "in/out": {}, "default": {}}
 
-        def args_valid(
-            self, _name: str, _args: list[int], _arg_info: dict
-        ) -> bool:
+        def args_valid(self, _name: str, _args: list[int], _arg_info: dict) -> bool:
             return False
 
     obj_exposed.edit(DummyEditObject(), text="1", text_add="replace")
     # In this path args are invalid, so object remains unchanged.
-    assert "demo not edited" in capsys.readouterr().out
+    assert "demo not edited" in caplog.text
 
 
 def test_link_handles_js_and_abstraction_paths_and_rejects_non_linkable(
-    capsys: CaptureFixture[str], tmp_path: Path, monkeypatch: MonkeyPatch
+    caplog: object, tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     """Verify js and abstraction paths can link while non-linkables fail."""
     monkeypatch.chdir(tmp_path)
@@ -103,4 +98,4 @@ def test_link_handles_js_and_abstraction_paths_and_rejects_non_linkable(
 
     non_linkable = MaxObject("toggle")
     non_linkable.link("demo.maxpat")
-    assert "cannot be linked to a file" in capsys.readouterr().out
+    assert "cannot be linked to a file" in caplog.text

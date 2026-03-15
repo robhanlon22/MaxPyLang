@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from typing import TYPE_CHECKING, Any
 
 from maxpylang.xlet import Inlet, Outlet
@@ -13,16 +13,12 @@ if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
 Connection = list[Any]
+_LOGGER = logging.getLogger(__name__)
 
 
 def _assertion_error(message: str) -> AssertionError:
     """Build an `AssertionError` instance."""
     return AssertionError(message)
-
-
-def _write_stdout(*parts: object) -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
 
 
 def delete(
@@ -66,6 +62,7 @@ def delete_get_extra_cords(self: MaxPatch, *objs: str) -> list[Connection]:
 
 def delete_cords(_self: MaxPatch, *cords: Connection, verbose: bool = True) -> None:
     """Delete patchcords from the patch."""
+    del verbose
     for cord in cords:
         outlet = cord[0]
         inlet = cord[1]
@@ -75,28 +72,23 @@ def delete_cords(_self: MaxPatch, *cords: Connection, verbose: bool = True) -> N
 
         inlet.remove_source(outlet)
         outlet.remove_destination(inlet)
-
-        if verbose:
-            _write_stdout(
-                "disconnected: (",
-                outlet.parent.name,
-                ": outlet",
-                outlet.index,
-                "-/->",
-                inlet.parent.name,
-                ": inlet",
-                inlet.index,
-                ")",
-            )
+        _LOGGER.debug(
+            "disconnected: ( %s : outlet %s -/-> %s : inlet %s )",
+            outlet.parent.name,
+            outlet.index,
+            inlet.parent.name,
+            inlet.index,
+        )
 
 
 def delete_objs(self: MaxPatch, *objs: str, verbose: bool = True) -> None:
     """Delete objects and any attached patchcords."""
+    del verbose
     obj_ids = list(objs)
     for obj_id in obj_ids.copy():
         if obj_id in self.objs:
             continue
-        _write_stdout("delete error:", obj_id, "not in patch")
+        _LOGGER.error("delete error: %s not in patch", obj_id)
         obj_ids.remove(obj_id)
 
     cords_to_delete = self.delete_get_extra_cords(*obj_ids)
@@ -105,7 +97,6 @@ def delete_objs(self: MaxPatch, *objs: str, verbose: bool = True) -> None:
     for obj_id in obj_ids:
         obj_name = self._objs[obj_id].name
         del self._objs[obj_id]
-        if verbose:
-            _write_stdout("object deleted:", obj_id, obj_name)
+        _LOGGER.debug("object deleted: %s %s", obj_id, obj_name)
 
     self._num_objs = len(self._objs)

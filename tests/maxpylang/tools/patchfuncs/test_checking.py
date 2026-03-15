@@ -3,14 +3,12 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from _pytest.capture import CaptureFixture
-
 from maxpylang import MaxPatch
 from maxpylang.tools.patchfuncs import checking
 
 
 def test_check_reports_sections_for_unknown_js_and_abstraction_flags(
-    tmp_path: Path, capsys: CaptureFixture[str]
+    tmp_path: Path, caplog: object
 ) -> None:
     """Verify patch check emits all object category sections."""
     patch = MaxPatch(verbose=False)
@@ -27,7 +25,7 @@ def test_check_reports_sections_for_unknown_js_and_abstraction_flags(
     }
 
     patch.check()
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "PatchCheck: unknown objects :" in output
     assert "PatchCheck: unlinked js objects :" in output
     assert (
@@ -58,7 +56,7 @@ def test_check_empty_sections_and_getters() -> None:
 
 
 def test_check_all_includes_all_categories_and_handles_all_alias(
-    tmp_path: Path, capsys: CaptureFixture[str]
+    tmp_path: Path, caplog: object
 ) -> None:
     """Verify full patch check output includes all object categories."""
     patch = MaxPatch(verbose=False)
@@ -74,7 +72,7 @@ def test_check_all_includes_all_categories_and_handles_all_alias(
     }
 
     assert patch.check("all") is None
-    output = capsys.readouterr().out
+    output = caplog.text
     assert "PatchCheck: unknown objects :" in output
     assert "PatchCheck: unlinked js objects :" in output
     assert (

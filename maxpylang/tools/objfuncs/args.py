@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Union
 
@@ -9,7 +10,6 @@ import tabulate  # type: ignore[import-untyped]
 
 from maxpylang.exceptions import UnknownObjectWarning
 from maxpylang.tools import typechecks as tc
-from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 Atom = Union[str, int, float]
 ArgSpec = dict[str, Any]
 ArgInfo = dict[str, list[ArgSpec]]
+_LOGGER = logging.getLogger(__name__)
 
 
 def args_valid(
@@ -84,10 +85,16 @@ def args_valid(
         return False
 
     if self.arg_warning and args_req:
-        write_stdout(
-            "(arg_warning):",
-            name,
-            ": args may have special reqs, check official docs for details",
+        _LOGGER.warning(
+            "%s",
+            " ".join(
+                str(part)
+                for part in (
+                    "(arg_warning):",
+                    name,
+                    ": args may have special reqs, check official docs for details",
+                )
+            ),
         )
 
     return True

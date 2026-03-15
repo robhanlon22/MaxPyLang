@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sys
+import logging
 from typing import TYPE_CHECKING, Any, Union
 
 from .tools import constants as _constants
@@ -27,11 +27,7 @@ ObjectValue = Any
 ObjectDict = dict[str, Any]
 ObjectArgs = list[Atom]
 ObjectInfoList = list[dict[str, Any]]
-
-
-def _write_stdout(*parts: object) -> None:
-    """Write a single line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+_LOGGER = logging.getLogger(__name__)
 
 
 class MaxObject:
@@ -370,12 +366,12 @@ class MaxObject:
         return _obj_misc.repr_object(self)
 
     def debug(self) -> None:
-        """Write the internal object state to stdout."""
-        _write_stdout("ref_file", self._ref_file)
-        _write_stdout("dict", self._dict)
-        _write_stdout("name", self._name)
-        _write_stdout("args", self._args)
-        _write_stdout("text_attribs", self._text_attribs)
-        _write_stdout("ins", self._ins)
-        _write_stdout("outs", self._outs)
-        _write_stdout("ext_file", self._ext_file)
+        """Log the internal object state at debug level."""
+        _LOGGER.debug("ref_file %s", self._ref_file)
+        _LOGGER.debug("dict %s", self._dict)
+        _LOGGER.debug("name %s", self._name)
+        _LOGGER.debug("args %s", self._args)
+        _LOGGER.debug("text_attribs %s", self._text_attribs)
+        _LOGGER.debug("ins %s", self._ins)
+        _LOGGER.debug("outs %s", self._outs)
+        _LOGGER.debug("ext_file %s", self._ext_file)

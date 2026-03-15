@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
-import sys
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -12,11 +12,7 @@ if TYPE_CHECKING:
     from maxpylang.maxpatch import MaxPatch
 
 JSONDict = dict[str, Any]
-
-
-def _write_stdout(*parts: object) -> None:
-    """Write a space-joined line to stdout."""
-    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+_LOGGER = logging.getLogger(__name__)
 
 
 def save(
@@ -27,6 +23,7 @@ def save(
     check: bool = True,
 ) -> None:
     """Save the patch to a `.maxpat` file."""
+    del verbose
     output_path = Path(filename)
     if ".maxpat" not in output_path.suffixes:
         output_path = output_path.with_suffix(".maxpat")
@@ -38,8 +35,7 @@ def save(
     self._filename = str(output_path)
     if check:
         self.check("unknown", "js", "abstractions")
-    if verbose:
-        _write_stdout("maxpatch saved to", output_path)
+    _LOGGER.debug("maxpatch saved to %s", output_path)
 
 
 def get_json(self: MaxPatch) -> JSONDict:

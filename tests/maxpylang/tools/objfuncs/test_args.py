@@ -1,14 +1,13 @@
 """Tests for objfuncs.args helpers."""
 
 import pytest
-from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxObject
 from maxpylang.exceptions import UnknownObjectWarning
 
 
 def test_args_valid_reports_missing_and_type_warnings(
-    capsys: CaptureFixture[str],
+    caplog: object,
 ) -> None:
     """Verify warnings are emitted for missing or mistyped arguments."""
     obj = MaxObject("toggle")
@@ -22,7 +21,7 @@ def test_args_valid_reports_missing_and_type_warnings(
     }
 
     assert obj.args_valid("osc", [440], arg_info) is True
-    assert "(arg_warning):" in capsys.readouterr().out
+    assert "(arg_warning):" in caplog.text
 
     with pytest.warns(UnknownObjectWarning, match="missing required arguments"):
         assert obj.args_valid("osc", [], arg_info) is False
