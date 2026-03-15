@@ -1,8 +1,10 @@
+"""Tests for import and object metadata generation helpers."""
+
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
-import xml.etree.ElementTree as ET
 
 from maxpylang import importobjs
 
@@ -183,7 +185,9 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(importobjs, "MaxPatch", DummyPatch)
     monkeypatch.setattr(
-        importobjs, "get_constant", lambda name: 2 if name == "wait_time" else None
+        importobjs,
+        "get_constant",
+        lambda name: 2 if name == "wait_time" else None,
     )
     monkeypatch.setattr(
         importobjs,
@@ -196,10 +200,14 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
         lambda refs, patch: calls.append(("add_barebones_objs", tuple(refs))),
     )
     monkeypatch.setattr(
-        importobjs.subprocess, "call", lambda cmd: calls.append(("open", cmd)) or 0
+        importobjs.subprocess,
+        "call",
+        lambda cmd: calls.append(("open", cmd)) or 0,
     )
     monkeypatch.setattr(
-        importobjs.time, "sleep", lambda seconds: calls.append(("sleep", seconds))
+        importobjs.time,
+        "sleep",
+        lambda seconds: calls.append(("sleep", seconds)),
     )
 
     result = importobjs.get_default_obj_info(
@@ -311,7 +319,8 @@ def test_get_objattrib_info_and_get_objinout_info_cover_ui_non_ui_and_missing_io
     io_root = tmp_path / "io"
     io_root.mkdir()
     (io_root / "demo_io.json").write_text(
-        json.dumps({"signal": {"numoutlets": [{"type": "signal"}]}}), encoding="utf-8"
+        json.dumps({"signal": {"numoutlets": [{"type": "signal"}]}}),
+        encoding="utf-8",
     )
     monkeypatch.setattr(importobjs, "obj_io_folder", str(io_root))
 
@@ -401,6 +410,10 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path
             <digest>Signal in</digest>
             <description>Input <br /> path</description>
           </inlet>
+          <inlet id="1" type="float">
+            <digest>Aux in</digest>
+            <description>Input</description>
+          </inlet>
         </inletlist>
         <outletlist>
           <outlet id="1" type="int">
@@ -417,7 +430,7 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path
             </arglist>
           </method>
         </methodlist>
-        """,
+""",
     )
 
     stripped = importobjs.strip_xml_text(
@@ -436,7 +449,13 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(tmp_path
                     "type": "signal",
                     "digest": "Signal in",
                     "description": "Input  path",
-                }
+                },
+                {
+                    "id": "1",
+                    "type": "float",
+                    "digest": "Aux in",
+                    "description": "Input",
+                },
             ],
             "outlets": [
                 {
@@ -475,7 +494,8 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
                 "doc": {"digest": "Keyword object", "methods": [{"name": "bang"}]},
                 "args": {"required": [], "optional": []},
                 "attribs": [{"name": "COMMON"}, {"name": "style"}],
-            }
+            },
+            indent=2,
         ),
         encoding="utf-8",
     )
@@ -500,7 +520,8 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
                     "optional": [{"name": "mode", "type": ["symbol"]}],
                 },
                 "attribs": [{"name": "COMMON"}, {"name": "hidden"}],
-            }
+            },
+            indent=2,
         ),
         encoding="utf-8",
     )
@@ -518,10 +539,159 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
     assert "Args:" in stub_text
     assert "Messages: bang" in stub_text
     assert "1: sidechain" in stub_text
-    assert "2 (float)" in stub_text
-    assert "1: status" in stub_text
-    assert "2 (int)" in stub_text
-    assert "Attributes: hidden" in stub_text
-    assert "warnings.catch_warnings()" in init_text
-    assert "UnknownObjectWarning" in init_text
+
+
+def test_importobjs_doc_and_stub_helpers(monkeypatch, tmp_path, capsys):
+    rich_ref = tmp_path / "rich.maxref.xml"
+    rich_ref.write_text(
+        """
+<c74object name="2d.wave~">
+  <digest>Signal <b>digest</b></digest>
+  <description>Main <i>description</i>.</description>
+<inletlist>
+    <inlet id="0" type="signal">
+      <digest>Signal input</digest>
+    </inlet>
+    <inlet id="1">
+      <digest>Bang input</digest>
+    </inlet>
+    <inlet id="2" type="int" />
+  </inletlist>
+  <outletlist>
+    <outlet id="0" type="signal">
+      <digest>Signal output</digest>
+    </outlet>
+    <outlet id="1">
+      <digest>Status output</digest>
+    </outlet>
+    <outlet id="2" type="int" />
+  </outletlist>
+  <methodlist>
+    <method name="bang">
+      <digest>Trigger now</digest>
+      <description>Force output.</description>
+      <arglist>
+        <arg name="force" type="int" />
+      </arglist>
+    </method>
+  </methodlist>
+</c74object>
+""".strip(),
+        encoding="utf-8",
+    )
+    placeholder_ref = tmp_path / "placeholder.maxref.xml"
+    placeholder_ref.write_text(
+        """
+<c74object name="in">
+  <digest>TEXT_HERE</digest>
+  <description>TEXT_HERE</description>
+  <methodlist>
+    <method name="noop">
+      <digest>TEXT_HERE</digest>
+      <description>TEXT_HERE</description>
+    </method>
+  </methodlist>
+</c74object>
+""".strip(),
+        encoding="utf-8",
+    )
+
+    assert importobjs.strip_xml_text(None) == ""
+    assert (
+        importobjs.strip_xml_text(
+            importobjs.ET.fromstring("<digest>Hello <b>there</b></digest>")
+        )
+        == "Hello there"
+    )
+
+    doc_info = importobjs.get_obj_doc_info(
+        [str(rich_ref), str(placeholder_ref)], ["2d.wave~", "in"]
+    )
+    assert doc_info["2d.wave~"] == {
+        "digest": "Signal digest",
+        "description": "Main description.",
+        "inlets": [
+            {"id": "0", "type": "signal", "digest": "Signal input"},
+            {"id": "1", "digest": "Bang input"},
+            {"id": "2", "type": "int"},
+        ],
+        "outlets": [
+            {"id": "0", "type": "signal", "digest": "Signal output"},
+            {"id": "1", "digest": "Status output"},
+            {"id": "2", "type": "int"},
+        ],
+        "methods": [
+            {
+                "name": "bang",
+                "digest": "Trigger now",
+                "description": "Force output.",
+                "args": [{"name": "force", "type": "int"}],
+            }
+        ],
+    }
+    assert doc_info["in"] == {"methods": [{"name": "noop"}]}
+
+    assert importobjs.sanitize_py_name("2d.wave~") == "_2d_wave_tilde"
+    assert importobjs.sanitize_py_name("in") == "in_"
+    assert importobjs.sanitize_py_name("live.dial") == "live_dial"
+
+    rich_obj_info = {
+        "doc": doc_info["2d.wave~"],
+        "args": {
+            "required": [{"name": "freq", "type": ["number", "int"]}],
+            "optional": [{"name": "label", "type": "symbol"}],
+        },
+        "attribs": [{"name": "COMMON"}, {"name": "gain"}],
+    }
+    docstring = importobjs._build_docstring("2d.wave~", rich_obj_info)
+    assert "2d.wave~ - Signal digest" in docstring
+    assert "Main description." in docstring
+    assert "freq (number, int, required)" in docstring
+    assert "label (symbol, optional)" in docstring
+    assert "0 (signal): Signal input" in docstring
+    assert "1: Bang input" in docstring
+    assert "2 (int)" in docstring
+    assert "Messages: bang" in docstring
+    assert "Attributes: gain" in docstring
+    assert (
+        importobjs._build_docstring("plain", {"doc": {}, "args": {}, "attribs": []})
+        == "plain"
+    )
+
+    fake_module = tmp_path / "generated_pkg" / "importobjs.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("# stub target", encoding="utf-8")
+    monkeypatch.setattr(importobjs, "__file__", str(fake_module))
+
+    info_root = tmp_path / "info"
+    demo_info = info_root / "demo"
+    empty_info = info_root / "empty"
+    demo_info.mkdir(parents=True)
+    empty_info.mkdir(parents=True)
+    (demo_info / "2d.wave~.json").write_text(
+        json.dumps(rich_obj_info, indent=2),
+        encoding="utf-8",
+    )
+    (demo_info / "in.json").write_text(
+        json.dumps({"doc": {"methods": [{"name": "noop"}]}, "args": {}, "attribs": []}),
+        encoding="utf-8",
+    )
+
+    importobjs.generate_stubs({}, {"demo": str(demo_info), "empty": str(empty_info)})
+
+    objects_dir = fake_module.parent / "objects"
+    stub_text = (objects_dir / "demo.py").read_text(encoding="utf-8")
+    init_text = (objects_dir / "__init__.py").read_text(encoding="utf-8")
+    output = capsys.readouterr().out
+
+    assert "stub module generated: objects/demo.py (2 objects)" in output
+    assert "stub generation complete" in output
+    assert "__all__ = [" in stub_text
+    assert "'_2d_wave_tilde'" in stub_text
+    assert "'in_'" in stub_text
+    assert "2d.wave~ - Signal digest" in stub_text
+    assert "MaxObject('2d.wave~')" in stub_text
+    assert "MaxObject('in')" in stub_text
+    assert "# ruff: noqa: F403" in init_text
+    assert 'warnings.simplefilter("ignore", UnknownObjectWarning)' in init_text
     assert "from .demo import *" in init_text

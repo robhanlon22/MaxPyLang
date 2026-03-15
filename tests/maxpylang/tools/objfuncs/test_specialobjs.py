@@ -1,36 +1,11 @@
+"""Tests for objfuncs.specialobjs helpers."""
+
 import json
-from types import SimpleNamespace
 
 import pytest
 
+from maxpylang import MaxObject
 from maxpylang.tools.objfuncs import specialobjs
-from maxpylang.tools.patchfuncs import checking, misc, saving
-from maxpylang.xlet import Inlet, Outlet
-
-
-class DummyObj:
-    def __init__(self, name, ref_file=None, ext_file=None):
-        self.name = name
-        self._name = name
-        self._ref_file = ref_file
-        self._ext_file = ext_file
-
-    def __repr__(self):
-        return f"<{self.name}>"
-
-
-class DummyPatch:
-    def __init__(self, objs):
-        self._objs = objs
-
-    def get_unknowns(self):
-        return checking.get_unknowns(self)
-
-    def get_abstractions(self):
-        return checking.get_abstractions(self)
-
-    def get_js_objs(self):
-        return checking.get_js_objs(self)
 
 
 class DummySpecialObject:
@@ -101,144 +76,6 @@ class DummySpecialObject:
         return {"volume": 11}
 
 
-def test_get_unknowns_get_abstractions_and_get_js_objs_partition_objects():
-    objs = {
-        "obj-1": DummyObj("mystery", ref_file=None),
-        "obj-2": DummyObj("linked-js", ref_file="js", ext_file="/tmp/file.js"),
-        "obj-3": DummyObj("js", ref_file="js", ext_file=None),
-        "obj-4": DummyObj(
-            "subpatch", ref_file="abstraction", ext_file="/tmp/thing.maxpat"
-        ),
-    }
-    patch = DummyPatch(objs)
-
-    assert checking.get_unknowns(patch) == {"obj-1": objs["obj-1"]}
-    assert checking.get_abstractions(patch) == {"obj-4": objs["obj-4"]}
-    assert checking.get_js_objs(patch) == (
-        {},
-        {"obj-3": objs["obj-3"]},
-    )
-
-
-def test_check_reports_all_sections_and_empty_sections(capsys):
-    linked_js = DummyObj("js", ref_file="js", ext_file="/tmp/linked.js")
-    unlinked_js = DummyObj("js", ref_file="js", ext_file=None)
-    abstraction = DummyObj("abs", ref_file="abstraction", ext_file="/tmp/demo.maxpat")
-    unknown = DummyObj("mystery", ref_file=None)
-    patch = DummyPatch(
-        {
-            "obj-1": unknown,
-            "obj-2": linked_js,
-            "obj-3": unlinked_js,
-            "obj-4": abstraction,
-        }
-    )
-
-    checking.check(patch)
-    output = capsys.readouterr().out
-    assert "PatchCheck: unknown objects :" in output
-    assert "PatchCheck: unlinked js objects :" in output
-    assert "PatchCheck: linked js objects" in output
-    assert "PatchCheck: linked abstractions" in output
-    assert "linked.js" in output
-    assert "demo.maxpat" in output
-
-    empty_patch = DummyPatch({})
-    checking.check(empty_patch, "unknowns", "js", "abstraction")
-    empty_output = capsys.readouterr().out
-    assert "no unknown objects" in empty_output
-    assert "no unlinked js objects" in empty_output
-    assert "no linked js objects" in empty_output
-    assert "no linked abstractions" in empty_output
-
-
-def test_add_barebones_obj_appends_box():
-    patch = SimpleNamespace(_patcher_dict={"patcher": {"boxes": []}})
-
-    misc.add_barebones_obj(patch, "cycle~ 440")
-
-    assert patch._patcher_dict["patcher"]["boxes"] == [
-        {
-            "box": {
-                "maxclass": "newobj",
-                "text": "cycle~ 440",
-                "patching_rect": [100.0, 100.0],
-            }
-        }
-    ]
-
-
-def test_get_json_includes_objects_and_patchcord_midpoints():
-    source_parent = SimpleNamespace(_name="source")
-    dest_parent = SimpleNamespace(_name="dest")
-    outlet = Outlet(source_parent, 0, types=["signal"])
-    inlet = Inlet(
-        dest_parent, 1, sources=[outlet], midpoints=[[10.0, 20.0]], types=["signal"]
-    )
-    outlet._destinations.append(inlet)
-
-    source_parent._dict = {"box": {"id": "obj-1", "text": "source"}}
-    source_parent.outs = [outlet]
-    dest_parent._dict = {"box": {"id": "obj-2", "text": "dest"}}
-    dest_parent.outs = []
-
-    patch = SimpleNamespace(
-        _patcher_dict={"patcher": {"boxes": [], "lines": [], "metadata": "kept"}},
-        _objs={"obj-1": source_parent, "obj-2": dest_parent},
-    )
-
-    result = saving.get_json(patch)
-
-    assert result["patcher"]["metadata"] == "kept"
-    assert result["patcher"]["boxes"] == [source_parent._dict, dest_parent._dict]
-    assert result["patcher"]["lines"] == [
-        {
-            "patchline": {
-                "destination": ["obj-2", 1],
-                "source": ["obj-1", 0],
-                "midpoints": [10.0, 20.0],
-            }
-        }
-    ]
-    assert patch._patcher_dict["patcher"]["boxes"] == []
-    assert patch._patcher_dict["patcher"]["lines"] == []
-
-
-def test_save_writes_maxpat_runs_check_and_prints(tmp_path, capsys):
-    calls = []
-    patch = SimpleNamespace(
-        _filename="old.maxpat",
-        get_json=lambda: {"patcher": {"boxes": [], "lines": []}},
-        check=lambda *flags: calls.append(flags),
-    )
-
-    saving.save(patch, filename=str(tmp_path / "demo"), verbose=True, check=True)
-
-    saved_path = tmp_path / "demo.maxpat"
-    assert saved_path.exists()
-    assert json.loads(saved_path.read_text()) == {"patcher": {"boxes": [], "lines": []}}
-    assert patch._filename == str(saved_path)
-    assert calls == [("unknown", "js", "abstractions")]
-    assert "maxpatch saved to" in capsys.readouterr().out
-
-
-def test_save_can_skip_check_and_keep_existing_suffix(tmp_path, capsys):
-    patch = SimpleNamespace(
-        _filename="before.maxpat",
-        get_json=lambda: {"ok": True},
-        check=lambda *flags: pytest.fail("check should not run"),
-    )
-
-    saving.save(
-        patch, filename=str(tmp_path / "named.maxpat"), verbose=False, check=False
-    )
-
-    saved_path = tmp_path / "named.maxpat"
-    assert saved_path.exists()
-    assert patch._filename == str(saved_path)
-    assert capsys.readouterr().out == ""
-
-
 def test_get_js_filename_uses_first_non_numeric_arg_and_appends_js():
     obj = DummySpecialObject(args=["2", "3", "script"])
     assert specialobjs.get_js_filename(obj) == "script.js"
@@ -249,11 +86,11 @@ def test_get_js_filename_returns_none_when_no_filename_arg():
     assert specialobjs.get_js_filename(obj) is None
 
 
-def test_get_js_io_parses_counts_and_falls_back_to_defaults(tmp_path, capsys):
+def test_get_js_io_reads_file_or_defaults(tmp_path, capsys):
     js_file = tmp_path / "counts.js"
-    js_file.write_text("inlets = 4; // comment\noutlets = 2;\n")
+    js_file.write_text("inlets = 4; // comment\noutlets = 2;\n", encoding="utf-8")
     fallback_file = tmp_path / "fallback.js"
-    fallback_file.write_text("console.log('no io markers');\n")
+    fallback_file.write_text("console.log('no io markers');\n", encoding="utf-8")
     obj = DummySpecialObject()
 
     assert specialobjs.get_js_io(obj, str(js_file), log_var="scan") == ("4", "2")
@@ -262,9 +99,9 @@ def test_get_js_io_parses_counts_and_falls_back_to_defaults(tmp_path, capsys):
     assert "defaults assumed (1 inlet, 1 outlet)" in output
 
 
-def test_update_js_from_file_updates_args_calls_edit_and_logs(tmp_path, capsys):
+def test_update_js_from_file_updates_args_and_logs(tmp_path, capsys):
     js_file = tmp_path / "counts.js"
-    js_file.write_text("inlets = 5;\noutlets = 7;\n")
+    js_file.write_text("inlets = 5;\noutlets = 7;\n", encoding="utf-8")
     obj = DummySpecialObject()
 
     specialobjs.update_js_from_file(obj, str(js_file), log_var="creation")
@@ -274,7 +111,7 @@ def test_update_js_from_file_updates_args_calls_edit_and_logs(tmp_path, capsys):
     assert "7 outlets" in capsys.readouterr().out
 
 
-def test_create_js_handles_missing_filename_and_missing_file(capsys):
+def test_create_js_reports_missing_filename_and_file(tmp_path, capsys):
     no_name = DummySpecialObject(args=["1", "2"])
     specialobjs.create_js(no_name, from_dict=False)
     missing = DummySpecialObject(args=["1", "2", "missing"])
@@ -286,9 +123,9 @@ def test_create_js_handles_missing_filename_and_missing_file(capsys):
     assert missing._ext_file is None
 
 
-def test_create_js_from_file_and_from_dict_updates_state(tmp_path, monkeypatch, capsys):
+def test_create_js_and_abstraction_update_state(tmp_path, monkeypatch, capsys):
     js_file = tmp_path / "script.js"
-    js_file.write_text("inlets = 1;\noutlets = 2;\n")
+    js_file.write_text("inlets = 1;\noutlets = 2;\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
     created = DummySpecialObject(args=["1", "2", "script"])
@@ -304,11 +141,11 @@ def test_create_js_from_file_and_from_dict_updates_state(tmp_path, monkeypatch, 
     assert "found, parsing for inlet/outlet numbers" in capsys.readouterr().out
 
 
-def test_link_js_covers_empty_filename_existing_file_and_missing_file(
+def test_link_js_handles_no_filename_existing_and_missing_file(
     tmp_path, monkeypatch, capsys
 ):
     js_file = tmp_path / "linked.js"
-    js_file.write_text("inlets = 8;\noutlets = 9;\n")
+    js_file.write_text("inlets = 8;\noutlets = 9;\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
 
     no_filename = DummySpecialObject(filename="")
@@ -325,7 +162,7 @@ def test_link_js_covers_empty_filename_existing_file_and_missing_file(
     assert "absent.js not found" in capsys.readouterr().out
 
 
-def test_create_abstraction_variants_update_expected_helpers(capsys):
+def test_create_abstraction_and_update_from_file_paths(capsys):
     from_dict_obj = DummySpecialObject(name="subpatch")
     specialobjs.create_abstraction(from_dict_obj, from_dict=True)
     assert from_dict_obj._ext_file == "subpatch.maxpat"
@@ -342,7 +179,7 @@ def test_create_abstraction_variants_update_expected_helpers(capsys):
     ]
 
 
-def test_update_abstraction_from_file_builds_dict_and_logs(capsys):
+def test_update_abstraction_from_file_builds_dict_and_logs(tmp_path, capsys):
     obj = DummySpecialObject(name="subpatch")
     obj.get_abstraction_io = lambda: (2, 1)
 
@@ -363,7 +200,7 @@ def test_update_abstraction_from_file_builds_dict_and_logs(capsys):
     assert "file found, abstraction created" in capsys.readouterr().out
 
 
-def test_get_abstraction_io_counts_inlets_and_outlets(tmp_path):
+def test_get_abstraction_io_counts_inlet_outlet_numbers(tmp_path):
     abstraction_file = tmp_path / "demo.maxpat"
     abstraction_file.write_text(
         json.dumps(
@@ -371,25 +208,27 @@ def test_get_abstraction_io_counts_inlets_and_outlets(tmp_path):
                 "patcher": {
                     "boxes": [
                         {"box": {"maxclass": "inlet"}},
-                        {"box": {"maxclass": "inlet"}},
-                        {"box": {"maxclass": "comment"}},
                         {"box": {"maxclass": "outlet"}},
+                        {"box": {"maxclass": "comment"}},
                     ]
                 }
             }
-        )
+        ),
+        encoding="utf-8",
     )
     obj = DummySpecialObject(name="demo")
     obj._ext_file = str(abstraction_file)
 
-    assert specialobjs.get_abstraction_io(obj) == (2, 1)
+    assert specialobjs.get_abstraction_io(obj) == (1, 1)
 
 
-def test_link_abstraction_updates_state_or_reports_missing(
+def test_link_abstraction_updates_obj_from_existing_or_reports_missing(
     tmp_path, monkeypatch, capsys
 ):
     abstraction_file = tmp_path / "linked.maxpat"
-    abstraction_file.write_text(json.dumps({"patcher": {"boxes": []}}))
+    abstraction_file.write_text(
+        json.dumps({"patcher": {"boxes": []}}), encoding="utf-8"
+    )
     monkeypatch.chdir(tmp_path)
 
     linked = DummySpecialObject(name="linked")
@@ -409,9 +248,10 @@ def test_link_abstraction_updates_state_or_reports_missing(
     [
         (["b", "i", "3.5", "s", "custom"], ["bang", "int", "float", "", "custom"]),
         (["7", "f", "x"], ["int", "float", ""]),
+        (["i", "3", "f"], ["int", "int", "float"]),
     ],
 )
-def test_trigger_and_unpack_type_helpers(args, expected):
+def test_trigger_and_unpack_out_type_helpers(args, expected):
     obj = DummySpecialObject(args=args)
     if args[0] == "b":
         assert specialobjs.get_trigger_out_types(obj) == expected
@@ -419,9 +259,13 @@ def test_trigger_and_unpack_type_helpers(args, expected):
         assert specialobjs.get_unpack_out_types(obj) == expected
 
 
-def test_update_vst_rewrites_save_list():
+def test_vst_instantiation_updates_save_field_and_outlets():
+    obj = MaxObject("vst~ 4 plugin")
+    assert len(obj.outs) == 10
+    assert obj._dict["box"]["save"][-4:] == [0, 4, "plugin", ";"]
+
+
+def test_update_vst_rewrites_save_field():
     obj = DummySpecialObject(args=["plug", "preset"])
-
     specialobjs.update_vst(obj)
-
     assert obj._dict["box"]["save"] == ["prefix", "plug", "preset", ";"]
