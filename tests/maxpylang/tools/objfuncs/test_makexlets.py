@@ -1,8 +1,10 @@
 """Tests for objfuncs.makexlets helpers."""
 
+import pytest
 from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxObject
+from maxpylang.tools.objfuncs.makexlets import _parse_comparator
 
 _NUM_INLETS = 1
 _NUM_OUTLETS = 2
@@ -12,8 +14,9 @@ _DEFAULT_INLET_COUNT = 2
 _ADD_AMOUNT = 1
 _INDEX_OUT_OF_RANGE = 99
 _NEGATIVE_COMPARE_NUM = 9
-_FALLBACK_COMPARE_NUM = 7
-_FILLER_COUNT = 4
+_NUMERIC_ARG_COUNT = 3
+_ACCEPTED_VALUE_COUNT = 4
+_FALLBACK_COMPARE_NUM = 9
 _SECOND_DEFAULT_COUNT = 2
 _OUT_OF_RANGE_INDEX = 7
 
@@ -33,7 +36,7 @@ def test_make_xlets_and_parse_io_num_rules() -> None:
         obj.parse_io_num(
             [{"argtype": "n", "index": _INDEX_ALL, "add_amt": _ADD_AMOUNT}], 0
         )
-        == _FILLER_COUNT
+        == _NUMERIC_ARG_COUNT
     )
     assert (
         obj.parse_io_num(
@@ -47,7 +50,7 @@ def test_make_xlets_and_parse_io_num_rules() -> None:
             ],
             0,
         )
-        == _FILLER_COUNT
+        == _ACCEPTED_VALUE_COUNT
     )
     assert (
         obj.parse_io_num(
@@ -61,6 +64,12 @@ def test_make_xlets_and_parse_io_num_rules() -> None:
         )
         == _FALLBACK_COMPARE_NUM
     )
+
+
+def test_parse_comparator_raises_for_unknown_operators() -> None:
+    """Ensure unsupported comparators raise a clear error."""
+    with pytest.raises(ValueError, match="unsupported comparator"):
+        _parse_comparator(5, "?? 10")
 
 
 def test_update_xlet_typing_respects_defaults_and_overrides() -> None:

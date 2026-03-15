@@ -1,28 +1,29 @@
+"""Constant paths and metadata used across MaxPyLang."""
+
 import json
-import os
-from typing import Any
+from pathlib import Path
 
-"""
-Set some constants.
-"""
-
-# path to package
-maxpy_path = os.path.abspath(
-    os.path.join(os.path.realpath(__file__), os.pardir, os.pardir)
-)
+_MAXPY_PATH = Path(__file__).resolve().parent.parent
+_DATA_PATH = _MAXPY_PATH / "data"
+_CONSTANTS_PATH = _DATA_PATH / "constants.json"
 
 
-# paths to files and folders in data folder
-data_folder = os.path.join(maxpy_path, "data")
-import_tools = os.path.join(data_folder, "import_tools.json")
-obj_info_folder = os.path.join(data_folder, "OBJ_INFO/")
-obj_io_folder = os.path.join(data_folder, "OBJ_IO/")
-patch_templates_path = os.path.join(data_folder, "PATCH_TEMPLATES/")
-constants_file = os.path.join(data_folder, "constants.json")
+maxpy_path = str(_MAXPY_PATH)
+data_folder = str(_DATA_PATH)
+import_tools = str(_DATA_PATH / "import_tools.json")
+obj_info_folder = str(_DATA_PATH / "OBJ_INFO")
+obj_io_folder = str(_DATA_PATH / "OBJ_IO")
+patch_templates_path = str(_DATA_PATH / "PATCH_TEMPLATES")
+constants_file = str(_CONSTANTS_PATH)
+
+
+def _constants_path() -> Path:
+    """Return the active constants file path."""
+    return Path(constants_file)
 
 
 # common box attributes available to all non-ui objects
-common_box_attribs: list[dict[str, Any]] = [
+common_box_attribs: list[dict[str, object]] = [
     {"name": "annotation", "type": "symbol", "size": 1},
     {"name": "background", "type": "int", "size": 1},  # 0 or 1
     {"name": "color", "type": "float", "size": 4},
@@ -43,7 +44,7 @@ common_box_attribs: list[dict[str, Any]] = [
 ]
 
 
-unknown_obj_dict: dict[str, Any] = {
+unknown_obj_dict: dict[str, object] = {
     "box": {
         "id": "obj-1",
         "maxclass": "newobj",
@@ -58,46 +59,36 @@ unknown_obj_dict: dict[str, Any] = {
 
 
 def set_packages_path(newpath: str) -> None:
-    """
-    Set the path to the Packages folder where the Max app keeps package information.
-    """
+    """Set the Packages folder path used for Max package information."""
     set_constant("packages_path", newpath)
 
 
 def set_max_path(newpath: str) -> None:
-    """
-    Set the path to the Max application, likely in your applications folder.
-    """
-    refpath = os.path.join(newpath, "Contents/Resources/C74/docs/refpages/")
+    """Set the Max application path and derive its reference-pages directory."""
+    refpath = str(
+        Path(newpath) / "Contents" / "Resources" / "C74" / "docs" / "refpages"
+    )
+    refpath += "/"
     set_constant("max_refpath", refpath)
 
 
 def set_wait_time(new_time: float) -> None:
-    """
-    Set the wait time for opening and closing Max files while importing packages.
-    """
+    """Set the wait time used while importing Max packages."""
     set_constant("wait_time", new_time)
 
 
-def set_constant(name: str, val: Any) -> None:
-    """
-    Sets constants according to name and value.
-    """
-    with open(constants_file) as f:
-        constants = json.loads(f.read())
+def set_constant(name: str, val: object) -> None:
+    """Set a named constant in the backing JSON file."""
+    constants_path = _constants_path()
+    constants = json.loads(constants_path.read_text(encoding="utf-8"))
     constants[name] = val
-    with open(constants_file, "w") as f:
-        json.dump(constants, f, indent=2)
+    constants_path.write_text(json.dumps(constants, indent=2), encoding="utf-8")
 
 
 # **** FOR GETTING CONSTANTS *****
 
 
-def get_constant(name: str) -> Any:
-    """
-    Returns the specified constant.
-    """
-    with open(constants_file) as f:
-        constants = json.loads(f.read())
-
+def get_constant(name: str) -> object:
+    """Return the requested constant from the backing JSON file."""
+    constants = json.loads(_constants_path().read_text(encoding="utf-8"))
     return constants[name]

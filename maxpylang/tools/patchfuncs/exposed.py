@@ -1,158 +1,104 @@
-"""
-tools.patchfuncs.exposed
+"""User-facing helpers exposed through `MaxPatch`."""
 
-Functions of MaxPatch that are exposed to the user.
+from __future__ import annotations
 
+import sys
+from typing import TYPE_CHECKING, cast
 
-    save() --> save patch to file
-    place() --> place objects
-    connect() --> connect patchcords
-    delete() --> delete objects and patchcords
-    check() --> check patch for unknown, js, abstraction objects
-
-    reorder() --> re-number objects in the patch
-    set_position() --> set cursor position
-    replace() --> replace objects
-    inspect() --> inspect the patch or patch objects
-
-"""
-
-from typing import Any
+if TYPE_CHECKING:
+    from maxpylang.maxobject import MaxObject
+    from maxpylang.maxpatch import MaxPatch
 
 
-# reorder objects
-def reorder(self: Any, verbose: bool = False) -> None:
-    """
-    Re-number objects in patch, starting from 1.
-    """
+def _write_stdout(*parts: object) -> None:
+    """Write a space-joined line to stdout."""
+    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+
+
+def reorder(self: MaxPatch, *, verbose: bool = False) -> None:
+    """Renumber patch objects sequentially."""
     if verbose:
-        print("reordering", self.num_objs, "objects...")
+        _write_stdout("reordering", self.num_objs, "objects...")
 
-    # reset number of objects, make new dict
     self._num_objs = 0
-    new_objs_dict: dict[str, Any] = {}
-
-    # for each existing obj...
-    for old_label, obj in self._objs.items():
+    new_objs_dict: dict[str, MaxObject] = {}
+    for obj in self._objs.values():
         self._num_objs += 1
-        obj._dict["box"]["id"] = "obj-" + str(
-            self._num_objs
-        )  # starting from 1, renumber objects
-        new_objs_dict[obj._dict["box"]["id"]] = obj  # re-label in new obj dict
-
-    # set new obj dict
+        obj.set_box_id(f"obj-{self._num_objs}")
+        new_objs_dict[obj.box_id] = obj
     self._objs = new_objs_dict
 
     if verbose:
-        print(self.num_objs, "objects reordered")
+        _write_stdout(self.num_objs, "objects reordered")
 
 
 def set_position(
-    self: Any,
+    self: MaxPatch,
     new_x: float,
     new_y: float,
+    *,
     from_place: bool = False,
     verbose: bool = False,
 ) -> None:
-    """
-    Set the current "cursor" position from which objects will be placed.
-
-    Must be formatted as [x, y] tuple or int of length 2.
-    """
-    # check format
+    """Set the patch placement cursor."""
     if isinstance(new_x, (float, int)) and isinstance(new_y, (float, int)):
         self._curr_position = [new_x, new_y]
         if verbose:
             if from_place:
-                print("starting position set to", self._curr_position)
+                _write_stdout("starting position set to", self._curr_position)
             else:
-                print("position set to", self._curr_position)
-
-    elif from_place:
-        print(
-            "Error: starting position must be specified as int or float, starting position not set"
-        )
-    else:
-        print("Error: position must be specified as int or float, position not set")
-
-
-# replace objects
-def replace(
-    self: Any,
-    curr_obj_num: str,
-    new_obj: Any,
-    retain: bool = True,
-    verbose: bool = False,
-    **new_attribs: Any,
-) -> None:
-    """
-    Replace an object in the patch with a different object.
-
-    The new object can be specified as a string, or by reference to a MaxObject.
-    Attributes in common (i.e. common box attribs) between old/new objects can be retained (will automatically retain).
-    Additional attribute settings will override retained attributes.
-    Patchcords will automatically be retained if possible, starting from xlet 0.
-
-    curr_obj_num --> id number in 'obj-num' string format of current object to be replaced
-    new_obj --> either string specification or MaxObject of new object
-    retain --> retain all attributes in common between old/new objects
-    verbose --> log to console
-    new_attribs --> any new attributes to give to the new object
-    """
-    # check current obj exists
-    if curr_obj_num not in self._objs.keys():
-        print(curr_obj_num, "does not exist, nothing changed")
+                _write_stdout("position set to", self._curr_position)
         return
 
-    # get curr obj, position, name
+    if from_place:
+        _write_stdout(
+            "Error: starting position must be specified as int or float, "
+            "starting position not set"
+        )
+        return
+
+    _write_stdout("Error: position must be specified as int or float, position not set")
+
+
+def replace(
+    self: MaxPatch,
+    curr_obj_num: str,
+    new_obj: object,
+    *,
+    retain: bool = True,
+    verbose: bool = False,
+    **new_attribs: object,
+) -> None:
+    """Replace one object with another and preserve compatible state."""
+    if curr_obj_num not in self._objs:
+        _write_stdout(curr_obj_num, "does not exist, nothing changed")
+        return
+
     old_obj = self._objs[curr_obj_num]
-    position, old_name = old_obj._dict["box"]["patching_rect"][:2], old_obj.name
+    old_box = cast("dict[str, object]", old_obj.raw_dict["box"])
+    position = cast("list[float]", old_box["patching_rect"][:2])
+    old_name = old_obj.name
 
-    # get new obj from spec
-    new_obj = self.get_obj_from_spec(new_obj)
-
-    # retain old attributes in new obj, if necessary
+    replacement = self.get_obj_from_spec(
+        cast("str | MaxObject | list[object]", new_obj),
+    )
     if retain:
-        new_obj.retain_attribs(old_obj)
+        replacement.retain_attribs(old_obj)
 
-    # put in new attributes
-    new_obj.edit(**new_attribs)
-
-    # update patchcords that remain
-    self.swap_patchcords(new_obj, old_obj)
-
-    # delete old obj
+    replacement.edit(**new_attribs)
+    self.swap_patchcords(replacement, old_obj)
     self.delete_objs(curr_obj_num, verbose=verbose)
+    self.place_obj(
+        replacement,
+        position=position,
+        verbose=verbose,
+        replace_id=curr_obj_num,
+    )
 
-    # replace new obj in old obj position
-    self.place_obj(new_obj, position=position, verbose=verbose, replace_id=curr_obj_num)
-
-    # log
     if verbose:
-        print(old_name, "replaced, new", curr_obj_num, ":", new_obj.name)
-
-    return
+        _write_stdout(old_name, "replaced, new", curr_obj_num, ":", replacement.name)
 
 
-# get patcher info
-def inspect(self: Any, *objs: str, info: str = "all") -> None:
-    """
-    Get desired information about specified objects.
-
-       objs --> list of objs to get info about, as strings "obj-num"
-           - if objs="all", print info for each object
-       info --> desired info to print out
-           - "all": print all info below
-           - "canvas": print obj-num, position, connections to each inlet/outlet
-           -
-           - "attributes": print current settings of all available attributes
-           - "common-box": print current settings of common box attributes, if applicable
-           - "obj-attribs": print current settings of obj-specific attributes, if applicable
-           -
-           - "connections": print connections to each inlet/outlet
-           - "position": print position on canvas
-
-    """
-    # probably just call the MaxObject info() function
-
-    return
+def inspect(self: MaxPatch, *objs: str, info: str = "all") -> None:
+    """Inspect the patch or selected objects."""
+    del self, objs, info

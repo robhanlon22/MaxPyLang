@@ -1,91 +1,67 @@
-"""
-tools.patchfuncs.saving
+"""Helpers for serializing `MaxPatch` instances."""
 
-Methods related to saving MaxPatches to files.
-
-    save() --> save MaxPatch to file
-    get_json() --> get json representation of MaxPatch
-"""
+from __future__ import annotations
 
 import copy
 import json
+import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from maxpylang.maxpatch import MaxPatch
+
+JSONDict = dict[str, object]
 
 
-# save patch to file
+def _write_stdout(*parts: object) -> None:
+    """Write a space-joined line to stdout."""
+    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+
+
 def save(
-    self: Any,
+    self: MaxPatch,
     filename: str = "default.maxpat",
+    *,
     verbose: bool = True,
     check: bool = True,
 ) -> None:
-    """
-    Save to .maxpat file.
+    """Save the patch to a `.maxpat` file."""
+    output_path = Path(filename)
+    if ".maxpat" not in output_path.suffixes:
+        output_path = output_path.with_suffix(".maxpat")
 
-    Usage:
-    filename --> savefile name
-    verbose --> print log message to console
-    check --> run check_patch before saving
-    """
-    # check proper extension
-    if ".maxpat" not in Path(filename).suffixes:
-        filename += ".maxpat"
-
-    # get json rep
     json_dict = self.get_json()
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(json_dict, handle, indent=2)
 
-    # write json to file
-    with open(filename, "w") as f:
-        json.dump(json_dict, f, indent=2)
-
-    # save filepath for later saving
-    self._filename = filename
-
-    # log unknown objs and unlinked js objs
-    # (abstractions only get marked as abstractions if the file is found)
-    # also log linked abstractions and linked js files
+    self._filename = str(output_path)
     if check:
         self.check("unknown", "js", "abstractions")
-
-    # log messages
     if verbose:
-        print("maxpatch saved to", filename)
+        _write_stdout("maxpatch saved to", output_path)
 
 
-def get_json(self: Any) -> dict[str, Any]:
-    """
-    Helper function for saving.
+def get_json(self: MaxPatch) -> JSONDict:
+    """Return the patch dictionary with boxes and lines populated."""
+    json_dict = cast("JSONDict", copy.deepcopy(self._patcher_dict))
+    patcher = cast("dict[str, object]", json_dict["patcher"])
+    boxes = cast("list[object]", patcher["boxes"])
+    lines = cast("list[object]", patcher["lines"])
 
-    Returns patcher dict with objects and patchcords added.
-    """
-    # copy patcher_dict, for inserting objs and cords
-    json_dict = cast("dict[str, Any]", copy.deepcopy(self._patcher_dict))
-
-    # for each obj...
-    for id, obj in self._objs.items():
-        # add object jsons
-        json_dict["patcher"]["boxes"].append(obj._dict)
-
-        # add patchcord json for outgoing edges...
+    for source_id, obj in self._objs.items():
+        boxes.append(obj.raw_dict)
         for outlet in obj.outs:
-            # to each destination...
             for destination in outlet.destinations:
-                # write patchcord going from id to destination.parent._dict['id']
-                patchcord_dict = {
+                patchcord_dict: JSONDict = {
                     "patchline": {
-                        "destination": [
-                            destination.parent._dict["box"]["id"],
-                            destination.index,
-                        ],
-                        "source": [id, outlet.index],
+                        "destination": [destination.parent.box_id, destination.index],
+                        "source": [source_id, outlet.index],
                         "midpoints": destination.midpoints[
                             destination.sources.index(outlet)
                         ],
                     }
                 }
-                # midpoints entry corresponding to outlet entry, in source inlet
-
-                json_dict["patcher"]["lines"].append(patchcord_dict)
+                lines.append(patchcord_dict)
 
     return json_dict

@@ -1,4 +1,9 @@
+"""Generate MaxMSP patches for chess board FEN states."""
+
+from __future__ import annotations
+
 import sys
+from pathlib import Path
 
 import maxpylang as mp
 
@@ -14,25 +19,15 @@ piece_map = {
 }
 
 
-def get_synth_info(char, row_ind, col_ind):
-    """
-    Put all synth info into a list.
-    """
-    if char.isupper():
-        color = "white"
-    else:
-        color = "black"
-
-    piecename = piece_map[char.upper()]
-    info = [piecename, color, row_ind, col_ind]
-
-    return info
+def get_synth_info(char: str, row_ind: int, col_ind: int) -> list[str | int]:
+    """Return synth metadata for a chess piece."""
+    color = "white" if char.isupper() else "black"
+    piece_name = piece_map[char.upper()]
+    return [piece_name, color, row_ind, col_ind]
 
 
-def build_patch(synth_info, board_ind):
-    """
-    Build and save a MaxMSP patch from a list of synth info.
-    """
+def build_patch(synth_info: list[list[str | int]], board_ind: int) -> None:
+    """Build and save a MaxMSP patch from a list of synth info."""
     # create empty patch
     patch = mp.MaxPatch()
 
@@ -41,15 +36,15 @@ def build_patch(synth_info, board_ind):
     ezdac = patch.place("ezdac~")[0]
 
     # make all synth objects
-    for synth in synth_info:
+    for synth_data in synth_info:
         # get info
-        piecename = synth[0]
-        color = synth[1]
-        row_ind = synth[2]
-        col_ind = synth[3]
+        piecename = synth_data[0]
+        color = synth_data[1]
+        row_ind = synth_data[2]
+        col_ind = synth_data[3]
 
         # make objects w/ specified size
-        synth = mp.MaxObject(piecename + "-synth", patching_rect=[0, 0, 100, 22])
+        synth_object = mp.MaxObject(piecename + "-synth", patching_rect=[0, 0, 100, 22])
         color_msg = mp.MaxObject("message " + color, patching_rect=[0, 0, 40, 20])
         col_msg = mp.MaxObject(
             "message " + column_coords[col_ind], patching_rect=[0, 0, 20, 20]
@@ -60,7 +55,7 @@ def build_patch(synth_info, board_ind):
 
         # place objects at custom placements
         patch.place(
-            synth,
+            synth_object,
             color_msg,
             col_msg,
             row_msg,
@@ -75,10 +70,10 @@ def build_patch(synth_info, board_ind):
 
         # connect objects
         patch.connect(
-            (color_msg.outs[0], synth.ins[0]),
-            (col_msg.outs[0], synth.ins[1]),
-            (row_msg.outs[0], synth.ins[2]),
-            (synth.outs[0], ezdac.ins[0]),
+            (color_msg.outs[0], synth_object.ins[0]),
+            (col_msg.outs[0], synth_object.ins[1]),
+            (row_msg.outs[0], synth_object.ins[2]),
+            (synth_object.outs[0], ezdac.ins[0]),
         )
 
     # save patch
@@ -86,14 +81,10 @@ def build_patch(synth_info, board_ind):
 
 
 def main() -> int:
-
+    """Load FEN strings, build patch files, and return an exit status."""
     # first, read file with FEN strings into a list of split FEN strings
-    fen_strings = []
-    with open("fens.txt") as fenfile:
-        lines = fenfile.read().splitlines()
-        for line in lines:
-            split_line = line.split("/")
-            fen_strings.append(split_line)
+    fens_file = Path("fens.txt")
+    fen_strings = [line.split("/") for line in fens_file.read_text().splitlines()]
 
     # then, process all FEN strings
     for board_ind in range(len(fen_strings)):

@@ -1,26 +1,27 @@
+"""Create a randomized oscillator-driven polyphonic test patch."""
+
 import maxpylang as mp
 
 patch = mp.MaxPatch()
 
 # Objects
-numNotes = 12
+num_notes = 12
 
 tg = patch.place("toggle", num_objs=1, starting_pos=[0, -1])[0]
 multislider = patch.place("multislider", num_objs=1, starting_pos=[0, 100])[0]
 
-unpHelper = "unpack"
-for i in range(numNotes):
-    unpHelper += " 0."
-unp = patch.place(unpHelper, num_objs=1, starting_pos=[0, 250])[0]
+unpack_helper = "unpack"
+for _i in range(num_notes):
+    unpack_helper += " 0."
+unp = patch.place(unpack_helper, num_objs=1, starting_pos=[0, 250])[0]
 
-
-mtr = patch.place("metro 100", num_objs=numNotes, starting_pos=[0, 315])
-rnd = patch.place("random 500", num_objs=numNotes, starting_pos=[0, 345])
-add = patch.place("+ 500", num_objs=numNotes, starting_pos=[0, 375])
-num = patch.place("number", num_objs=numNotes, starting_pos=[0, 405])
-cyc = patch.place("cycle~ ", num_objs=numNotes, starting_pos=[0, 435])
-met = patch.place("meter~ ", num_objs=numNotes, starting_pos=[0, 487])
-gn = patch.place("gain~ ", num_objs=numNotes, starting_pos=[0, 505])
+mtr = patch.place("metro 100", num_objs=num_notes, starting_pos=[0, 315])
+rnd = patch.place("random 500", num_objs=num_notes, starting_pos=[0, 345])
+add = patch.place("+ 500", num_objs=num_notes, starting_pos=[0, 375])
+num = patch.place("number", num_objs=num_notes, starting_pos=[0, 405])
+cyc = patch.place("cycle~ ", num_objs=num_notes, starting_pos=[0, 435])
+met = patch.place("meter~ ", num_objs=num_notes, starting_pos=[0, 487])
+gn = patch.place("gain~ ", num_objs=num_notes, starting_pos=[0, 505])
 
 
 mult = patch.place("*~ 0.05", num_objs=1, starting_pos=[0, 665])[0]
@@ -47,19 +48,17 @@ for c, g in zip(cyc, gn):
 for g, m in zip(gn, met):
     patch.connect([g.outs[0], m.ins[0]])
 
-for g in gn:
-    patch.connect([g.outs[0], mult.ins[0]])
+for gain in gn:
+    patch.connect([gain.outs[0], mult.ins[0]])
 
-for m in mtr:
-    patch.connect([tg.outs[0], m.ins[0]])
+for metro_obj in mtr:
+    patch.connect([tg.outs[0], metro_obj.ins[0]])
 
 patch.connect([mult.outs[0], ez.ins[0]])
 patch.connect([mult.outs[0], ez.ins[1]])
 
-i = 0
-for g in gn:
-    patch.connect([unp.outs[i], g.ins[0]])
-    i += 1
+for index, gain in enumerate(gn):
+    patch.connect([unp.outs[index], gain.ins[0]])
 
 
 patch.save("tester3.maxpat")

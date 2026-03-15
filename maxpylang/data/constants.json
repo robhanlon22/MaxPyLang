@@ -1,5 +1,6 @@
 {
   "max_refpath": "/Applications/Max.app/Contents/Resources/C74/docs/refpages/",
-  "packages_path": "/Users/larkpie/Documents/Max 8/Packages",
-  "wait_time": 7
+  "packages_path": "/private/var/folders/wv/6sl1w5rn16v5jjn9yszh8hj80000gn/T/pytest-of-rob/pytest-121/test_constants_helpers_update_0/packages",
+  "wait_time": 9,
+  "custom": "value"
 }

@@ -23,6 +23,9 @@ _EXPECTED_NUMOUTLETS = 1
 _VST_OUTLETS = 10
 _ABSTRACTION_NOIN = 2
 _ABSTRACTION_NOOUT = 1
+_DECLARED_INLETS = 3
+_DECLARED_OUTLETS = 2
+
 
 class DummySpecialObject:
     """Fixture object for special-object tests."""
@@ -57,6 +60,7 @@ class DummySpecialObject:
         self.__dict__["made_xlets"] = False
         self.__dict__["updated_text"] = False
         self.__dict__["_ref_file"] = None
+        self.unknown_obj_dict = {"box": {"text": "UNK"}}
 
     def edit(self, **kwargs: object) -> None:
         """Capture edit calls for inspection."""
@@ -76,9 +80,7 @@ class DummySpecialObject:
         """Return the resolved js filename."""
         return specialobjs.get_js_filename(self)
 
-    def update_js_from_file(
-        self, filename: str, log_var: str | None = None
-    ) -> None:
+    def update_js_from_file(self, filename: str, log_var: str | None = None) -> None:
         """Proxy through to the real js-file updater."""
         return specialobjs.update_js_from_file(self, filename, log_var=log_var)
 
@@ -199,7 +201,7 @@ def test_create_js_and_abstraction_update_state(
     specialobjs.create_js(from_dict_obj, from_dict=True)
     assert from_dict_obj.__dict__["_args"] == [
         _ABSTRACTION_NOIN,
-        _ABSTRACTION_NOOUT,
+        _NUM_OUTLET_DEFAULT,
         "script.js",
     ]
     assert from_dict_obj.__dict__["updated_text"] is True
@@ -249,7 +251,7 @@ def test_create_abstraction_and_update_from_file_paths(
 
 
 def test_update_abstraction_from_file_builds_dict_and_logs(
-    capsys: CaptureFixture[str]
+    capsys: CaptureFixture[str],
 ) -> None:
     """Verify explicit update updates abstraction dict and xlet metadata."""
     obj = DummySpecialObject(name="subpatch")
@@ -318,6 +320,58 @@ def test_link_abstraction_updates_obj_from_existing_or_reports_missing(
     missing = DummySpecialObject(name="missing")
     specialobjs.link_abstraction(missing, "missing")
     assert "missing.maxpat not found" in capsys.readouterr().out
+
+
+def test_create_abstraction_from_dict_reports_creation(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Ensure the dict-path abstraction creation logs and sets the ext file."""
+    obj = MaxObject("custom")
+
+    specialobjs.create_abstraction(obj, from_dict=True)
+
+    assert obj.__dict__["_ext_file"] == "custom.maxpat"
+    assert "abstraction created" in capsys.readouterr().out
+
+
+def test_create_abstraction_requires_text_when_loading_from_specs() -> None:
+    """Missing text should fail when creating abstractions from specs."""
+    with pytest.raises(AssertionError, match="text is required"):
+        specialobjs.create_abstraction(
+            DummySpecialObject(name="plain"),
+            text=None,
+            extra_attribs=None,
+            from_dict=False,
+        )
+
+
+def test_create_declared_abstraction_applies_extra_attribs(
+    capsys: CaptureFixture[str],
+) -> None:
+    """Verify declared abstractions accept extra attributes and sizes."""
+    obj = MaxObject("declared")
+
+    specialobjs.create_declared_abstraction(
+        obj, text="declared", numinlets=3, numoutlets=2, extra_attribs={"bgcolor": 1}
+    )
+
+    assert obj.__dict__["_dict"]["box"]["numinlets"] == _DECLARED_INLETS
+    assert obj.__dict__["_dict"]["box"]["numoutlets"] == _DECLARED_OUTLETS
+    assert obj.__dict__["_dict"]["box"]["text"] == "declared"
+    output = capsys.readouterr().out
+    assert "bgcolor requires 4 arguments" in output
+    assert "bgcolor" not in obj.__dict__["_dict"]["box"]
+
+
+def test_get_abstraction_io_requires_linked_file() -> None:
+    """Requesting abstraction IO before linking should raise."""
+    obj = MaxObject("demo")
+    obj.__dict__["_ext_file"] = None
+    with pytest.raises(
+        AssertionError,
+        match="abstraction file must be linked before I/O can be read",
+    ):
+        specialobjs.get_abstraction_io(obj)
 
 
 @pytest.mark.parametrize(

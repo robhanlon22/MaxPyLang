@@ -1,10 +1,12 @@
+"""Create a Max patch that reroutes csv data through makenote."""
+
 import maxpylang as mp
 
 patch = mp.MaxPatch(load_file="tester2.maxpat")
 
-for k, v in patch.objs.items():
-    if v._name == "makenote":
-        makenote = patch.objs[k]
+for obj in patch.objs.values():
+    if obj.name == "makenote":
+        makenote = obj
         break
 
 csv = patch.place("csvReader")[0]

@@ -161,3 +161,95 @@ def test_maxpatch_dict_property_and_default_place_obj_position() -> None:
 
     placed = patch.place_obj("toggle", verbose=False)
     assert placed.__dict__["_dict"]["box"]["patching_rect"][:2] == [0.0, 0.0]
+
+
+def test_maxpatch_wrapper_legacy_args_and_option_guards(
+    tmp_path: Path,
+) -> None:
+    """Cover legacy positional wrappers and option-validation helpers."""
+    false_flag = False
+    true_flag = True
+    template = tmp_path / "template.json"
+    template.write_text(
+        '{"patcher": {"rect": [0, 0, 120, 120], "boxes": [], "lines": []}}',
+        encoding="utf-8",
+    )
+    patch_dict = {
+        "patcher": {
+            "rect": [0, 0, 120, 120],
+            "boxes": [
+                {
+                    "box": {
+                        "id": "obj-1",
+                        "maxclass": "newobj",
+                        "numinlets": 1,
+                        "numoutlets": 1,
+                        "patching_rect": [0.0, 0.0, 20.0, 20.0],
+                        "text": "toggle",
+                        "outlettype": [""],
+                    }
+                }
+            ],
+            "lines": [],
+        }
+    }
+    input_file = tmp_path / "input.maxpat"
+    input_file.write_text(json.dumps(patch_dict), encoding="utf-8")
+
+    with pytest.raises(TypeError, match="verbose must be a bool"):
+        MaxPatch(verbose="bad")
+    with pytest.raises(TypeError, match="seed must be an int or None"):
+        MaxPatch(verbose=False).place("toggle", seed="bad")
+    with pytest.raises(TypeError, match="unexpected keyword arguments: extra"):
+        MaxPatch(verbose=False).load_template(str(template), extra=True)
+
+    with pytest.raises(TypeError, match="at most two legacy positional flags"):
+        MaxPatch(None, None, true_flag, false_flag, true_flag)
+
+    patch = MaxPatch(str(template), None, false_flag, false_flag)
+    patch.load_template(str(template), false_flag)
+    patch.load_file(str(input_file), false_flag, false_flag)
+    patch.load_objs_from_dict(patch_dict, false_flag)
+    patch.load_patchcords_from_dict({"patcher": {"boxes": [], "lines": []}}, false_flag)
+    patch.reorder(true_flag)
+    patch.set_position(1, 2, false_flag, false_flag)
+    patch.place_check_args(
+        ("toggle",),
+        false_flag,
+        1,
+        None,
+        None,
+        "grid",
+        [1, 1],
+        None,
+    )
+    patch.place_pick_objs(("toggle",), false_flag, 1, None, None, false_flag)
+    patch.place_grid(["toggle"], [10, 10], true_flag)
+    patch.place_random(["toggle"], 1, true_flag)
+    patch.place_custom(["toggle"], [[3, 4]], true_flag)
+    patch.place_vertical(["toggle"], 5, true_flag)
+    patch.place_obj("toggle", None, true_flag, "obj-9")
+    patch.delete(None, None, false_flag)
+    patch.replace("obj-9", "button", false_flag, true_flag)
+    patch.save(str(tmp_path / "out.maxpat"), false_flag, false_flag)
+
+    with pytest.raises(TypeError, match="load_file accepts at most two legacy"):
+        patch.load_file(str(input_file), false_flag, false_flag, false_flag)
+    with pytest.raises(TypeError, match="set_position accepts at most two legacy"):
+        patch.set_position(0, 0, false_flag, false_flag, false_flag)
+    with pytest.raises(TypeError, match="replace accepts at most two legacy"):
+        patch.replace("obj-9", "toggle", false_flag, false_flag, false_flag)
+    with pytest.raises(TypeError, match="save accepts at most two legacy"):
+        patch.save(str(tmp_path / "bad.maxpat"), false_flag, false_flag, false_flag)
+    with pytest.raises(
+        TypeError,
+        match="too many positional arguments for place_check_args",
+    ):
+        patch.place_check_args(("toggle",), 1, 2, 3, 4, 5, 6, 7, 8)
+    with pytest.raises(
+        TypeError,
+        match="too many positional arguments for place_pick_objs",
+    ):
+        patch.place_pick_objs(("toggle",), 1, 2, 3, 4, 5, 6)
+    with pytest.raises(TypeError, match="place_obj accepts at most two legacy"):
+        patch.place_obj("toggle", None, false_flag, "obj-10", "extra")

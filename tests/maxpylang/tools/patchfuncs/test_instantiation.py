@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 
+import pytest
 from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
@@ -11,9 +12,7 @@ from maxpylang import MaxPatch
 _RELOADED_OBJECT_COUNT = 2
 
 
-def test_load_template_from_path(
-    tmp_path: Path, capsys: CaptureFixture[str]
-) -> None:
+def test_load_template_from_path(tmp_path: Path, capsys: CaptureFixture[str]) -> None:
     """Verify a template file is loaded and applied to the patch."""
     template_dir = tmp_path / "templates"
     template_dir.mkdir()
@@ -148,3 +147,20 @@ def test_clean_patcher_dict_removes_boxes_and_lines() -> None:
     cleaned = patch.clean_patcher_dict(copy.deepcopy(patch_dict))
     assert cleaned["patcher"]["boxes"] == []
     assert cleaned["patcher"]["lines"] == []
+
+
+def test_load_template_raises_when_template_is_missing(tmp_path: Path) -> None:
+    """Missing template names should raise the helper assertion."""
+    patch = MaxPatch(verbose=False)
+    patch.patch_templates_path = str(tmp_path / "templates")
+
+    with pytest.raises(AssertionError, match="template file not found"):
+        patch.load_template("missing.json", verbose=False)
+
+
+def test_load_template_missing_file_raises(tmp_path: Path) -> None:
+    """Missing templates should raise without side effects."""
+    patch = MaxPatch(verbose=False)
+    patch.patch_templates_path = str(tmp_path)
+    with pytest.raises(AssertionError, match="template file not found"):
+        patch.load_template("missing.json", verbose=False)

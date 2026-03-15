@@ -1,3 +1,5 @@
+"""Create a simple hello-world style MaxMSP patch."""
+
 import maxpylang as mp
 
 patch = mp.MaxPatch()

@@ -1,103 +1,83 @@
-"""
-tools.patchfuncs.deleting
+"""Helpers for deleting patch objects and patchcords."""
 
-Methods related to deleting objects and patchcords from a MaxPatch.
+from __future__ import annotations
 
-    delete() --> driver method for deleting objs/patchcords
+import sys
+from typing import TYPE_CHECKING
 
-    delete_get_extra_cords() --> get a list of all patchcords attached to objs being deleted
-    delete_cords() --> delete patchcords
-    delete_objs() --> delete objects
+from maxpylang.xlet import Inlet, Outlet
 
-"""
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-from collections.abc import Sequence
-from typing import Any, Optional
+    from maxpylang.maxpatch import MaxPatch
 
-Connection = list[Any]
+Connection = list[object]
 
 
-# delete objects and patchcords
+def _assertion_error(message: str) -> AssertionError:
+    """Build an `AssertionError` instance."""
+    return AssertionError(message)
+
+
+def _write_stdout(*parts: object) -> None:
+    """Write a space-joined line to stdout."""
+    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
+
+
 def delete(
-    self: Any,
-    objs: Optional[Sequence[str]] = None,
-    cords: Optional[Sequence[Connection]] = None,
+    self: MaxPatch,
+    objs: Sequence[str] | None = None,
+    cords: Sequence[Connection] | None = None,
+    *,
     verbose: bool = True,
 ) -> None:
-    """
-    Delete objects and/or patchcords.
-    Deleting objects will automatically delete any patchcords attached to them.
-
-     objs --> list of string "obj-num" objects to delete
-    cords --> list of connections (Outlet, Inlet)
-    """
+    """Delete objects and/or patchcords from the patch."""
     obj_ids = list(objs or [])
     cord_list = list(cords or [])
 
-    # check format
-    for obj in obj_ids:
-        assert isinstance(obj, str), (
-            "objects to delete must be given as strings 'obj-num'"
-        )
+    for obj_id in obj_ids:
+        if isinstance(obj_id, str):
+            continue
+        message = "objects to delete must be given as strings 'obj-num'"
+        raise _assertion_error(message)
+
     self.check_connection_format(cord_list)
-
-    # remove nonexistent cords
-    cord_list = self.check_connection_exists(cord_list)
-
-    # delete cords
-    self.delete_cords(*cord_list, verbose=verbose)
-
-    # delete objs
+    existing_cords = self.check_connection_exists(cord_list)
+    self.delete_cords(*existing_cords, verbose=verbose)
     self.delete_objs(*obj_ids, verbose=verbose)
 
 
-def delete_get_extra_cords(self: Any, *objs: str) -> list[Connection]:
-    """
-    Helper function for deleting.
-
-    Gets patchcords attached to objects being deleted and adds to cords list.
-    Returns updated cords list.
-    """
+def delete_get_extra_cords(self: MaxPatch, *objs: str) -> list[Connection]:
+    """Return patchcords attached to the objects being deleted."""
     cords: list[Connection] = []
     for obj_id in objs:
-        if obj_id in self._objs.keys():
-            obj = self._objs[obj_id]
-            # add cords coming from object to list for deletion
-            for outlet in obj.outs:
-                for dest_inlet in outlet.destinations:
-                    cords.append([outlet, dest_inlet])
-            # add cords coming to object to list for deletion
-            for inlet in obj.ins:
-                for source_outlet in inlet.sources:
-                    cords.append([source_outlet, inlet])
+        if obj_id not in self._objs:
+            continue
+        obj = self._objs[obj_id]
+        for outlet in obj.outs:
+            cords.extend([outlet, destination] for destination in outlet.destinations)
+        for inlet in obj.ins:
+            cords.extend([source, inlet] for source in inlet.sources)
 
-    # just to be sure...
-    self.check_connection_format(cords)  # check proper formatting of cords
-
+    self.check_connection_format(cords)
     return cords
 
 
-def delete_cords(self: Any, *cords: Connection, verbose: bool = True) -> None:
-    """
-    Helper function for deleting.
-
-    Delete cords in list.
-    Cords must be specified as (Outlet, Inlet) pairs
-    """
+def delete_cords(_self: MaxPatch, *cords: Connection, verbose: bool = True) -> None:
+    """Delete patchcords from the patch."""
     for cord in cords:
         outlet = cord[0]
         inlet = cord[1]
-        midpoints = inlet._midpoints[inlet.sources.index(outlet)]
+        if not isinstance(outlet, Outlet) or not isinstance(inlet, Inlet):
+            message = "cords must be specified as (Outlet, Inlet) pairs"
+            raise _assertion_error(message)
 
-        # delete inlet from outlet destinations
-        outlet._destinations.remove(inlet)
-        # delete outlet from inlet sources
-        inlet._sources.remove(outlet)
-        # delete corresponding midpoint from inlet midpoints
-        inlet._midpoints.remove(midpoints)
+        inlet.remove_source(outlet)
+        outlet.remove_destination(inlet)
 
         if verbose:
-            print(
+            _write_stdout(
                 "disconnected: (",
                 outlet.parent.name,
                 ": outlet",
@@ -110,36 +90,22 @@ def delete_cords(self: Any, *cords: Connection, verbose: bool = True) -> None:
             )
 
 
-def delete_objs(self: Any, *objs: str, verbose: bool = True) -> None:
-    """
-    Helper function for deleting.
-
-    Deletes objects on list.
-    Also deletes any patchcords attached to those objects.
-
-    Objects must be specified as 'obj-num' strings
-    """
+def delete_objs(self: MaxPatch, *objs: str, verbose: bool = True) -> None:
+    """Delete objects and any attached patchcords."""
     obj_ids = list(objs)
+    for obj_id in obj_ids.copy():
+        if obj_id in self.objs:
+            continue
+        _write_stdout("delete error:", obj_id, "not in patch")
+        obj_ids.remove(obj_id)
 
-    # check for obj existence
-    for obj in obj_ids.copy():
-        if obj not in self.objs.keys():  # if object in patch
-            print(
-                "delete error:", obj, "not in patch"
-            )  # if obj not in patch, print error
-            obj_ids.remove(obj)  # and remove from delete list
-
-    # get patchcords connected to objs, for deletion
     cords_to_delete = self.delete_get_extra_cords(*obj_ids)
-    # delete patchcords
     self.delete_cords(*cords_to_delete)
 
-    # delete objects
-    for obj in obj_ids:
-        obj_name = self._objs[obj].name  # save for logging
-        del self._objs[obj]
-
+    for obj_id in obj_ids:
+        obj_name = self._objs[obj_id].name
+        del self._objs[obj_id]
         if verbose:
-            print("object deleted:", obj, obj_name)
+            _write_stdout("object deleted:", obj_id, obj_name)
 
     self._num_objs = len(self._objs)

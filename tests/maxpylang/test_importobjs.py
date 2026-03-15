@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+import importlib
 import json
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
-from defusedxml.ElementTree import parse as parse_xml
-
 from maxpylang import importobjs
+from maxpylang.importobjs import (
+    _DOC_WIDTH,
+    _append_args,
+    _append_methods,
+    _build_docstring,
+    _build_objects_init_lines,
+    _io_line,
+    _wrap_lines,
+    generate_stubs,
+)
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
@@ -27,8 +37,15 @@ def write_maxref(
     )
 
 
+try:
+    _xml_parser = importlib.import_module("defusedxml.ElementTree")
+except ModuleNotFoundError:  # pragma: no cover
+    _xml_parser = importlib.import_module("xml.etree.ElementTree")
+
+
 def _read_xml_root(path: Path) -> object:
-    return parse_xml(str(path)).getroot()
+    return _xml_parser.parse(str(path)).getroot()
+
 
 def test_import_objs_creates_info_root_and_delegates(
     monkeypatch: MonkeyPatch, tmp_path: Path
@@ -89,10 +106,10 @@ def test_get_package_paths_expands_vanilla_and_custom_packages(
     result = importobjs.get_package_paths(["vanilla", "custom"])
 
     assert result == {
-        "max": "/Applications/Max/refs/max-ref",
-        "msp": "/Applications/Max/refs/msp-ref",
-        "jit": "/Applications/Max/refs/jit-ref",
-        "custom": "/Users/rob/Documents/Max Packages/custom/docs",
+        "max": Path("/Applications/Max/refs/max-ref"),
+        "msp": Path("/Applications/Max/refs/msp-ref"),
+        "jit": Path("/Applications/Max/refs/jit-ref"),
+        "custom": Path("/Users/rob/Documents/Max Packages/custom/docs"),
     }
 
 
@@ -123,9 +140,9 @@ def test_prep_make_info_folders_handles_missing_skip_new_and_overwrite(
     )
 
     assert result == {
-        "skipme": str(skipped_info),
-        "replace-me": str(overwritten_info),
-        "brand-new": str(obj_info_root / "brand-new"),
+        "skipme": skipped_info,
+        "replace-me": overwritten_info,
+        "brand-new": obj_info_root / "brand-new",
     }
     assert not (overwritten_info / "old.json").exists()
     assert (obj_info_root / "brand-new").exists()
@@ -225,14 +242,14 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
         lambda refs, _patch: calls.append(("add_barebones_objs", tuple(refs))),
     )
     monkeypatch.setattr(
-        importobjs.subprocess,
-        "call",
-        lambda cmd: calls.append(("open", cmd)) or 0,
-    )
-    monkeypatch.setattr(
         importobjs.time,
         "sleep",
         lambda seconds: calls.append(("sleep", seconds)),
+    )
+    monkeypatch.setattr(
+        importobjs.webbrowser,
+        "open",
+        lambda url: calls.append(("open", url)) or True,
     )
 
     result = importobjs.get_default_obj_info(
@@ -244,7 +261,7 @@ def test_get_default_obj_info_uses_patch_save_open_sleep_and_cleans_file(
         "beta": {"box": {"text": "beta-default"}},
     }
     assert ("save", "defaults_demo.maxpat", False) in calls
-    assert ("open", ["open", "defaults_demo.maxpat"]) in calls
+    assert ("open", (tmp_path / "defaults_demo.maxpat").as_uri()) in calls
     assert ("sleep", 2) in calls
     assert not (tmp_path / "defaults_demo.maxpat").exists()
 
@@ -385,9 +402,7 @@ def test_save_obj_info_filters_unlisted_writes_json_and_alias_file(
     monkeypatch.setattr(
         importobjs,
         "get_default_obj_info",
-        lambda _package, _refs, _names: {
-            "alpha": {"box": {"text": "alias-alpha"}}
-        },
+        lambda _package, _refs, _names: {"alpha": {"box": {"text": "alias-alpha"}}},
     )
     monkeypatch.setattr(
         importobjs,
@@ -518,7 +533,7 @@ def test_get_obj_doc_info_and_strip_xml_text_extracts_semantic_sections(
 def test_generate_stubs_writes_modules_and_warning_suppressing_init(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
- ) -> None:
+) -> None:
     """Verify generated stubs include object exports and init warning suppression."""
     fake_importobjs = tmp_path / "fake_importobjs.py"
     fake_importobjs.write_text("# stub", encoding="utf-8")
@@ -576,7 +591,8 @@ def test_generate_stubs_writes_modules_and_warning_suppressing_init(
     assert "_2d_wave_tilde" in stub_text
     assert "in_ = MaxObject('in')" in stub_text
     assert "Args:" in stub_text
-    assert "Messages: bang" in stub_text
+    assert "Messages:" in stub_text
+    assert "bang" in stub_text
     assert "1: sidechain" in stub_text
 
 
@@ -643,10 +659,7 @@ def test_importobjs_doc_helpers_and_doc_info(
     assert importobjs.strip_xml_text(None) == ""
     snippet_file = tmp_path / "snippet_digest.maxref.xml"
     snippet_file.write_text("<digest>Hello <b>there</b></digest>", encoding="utf-8")
-    assert (
-        importobjs.strip_xml_text(_read_xml_root(snippet_file))
-        == "Hello there"
-    )
+    assert importobjs.strip_xml_text(_read_xml_root(snippet_file)) == "Hello there"
 
     doc_info = importobjs.get_obj_doc_info(
         [str(rich_ref), str(placeholder_ref)], ["2d.wave~", "in"]
@@ -691,7 +704,7 @@ def test_importobjs_doc_helpers_and_doc_info(
     fake_module.parent.mkdir(parents=True)
     fake_module.write_text("# stub target", encoding="utf-8")
     monkeypatch.setattr(importobjs, "__file__", str(fake_module))
-    assert "2d.wave~ - Signal digest" in rich_obj_info["doc"]["digest"]
+    assert rich_obj_info["doc"]["digest"] == "Signal digest"
 
     info_root = tmp_path / "info"
     demo_info = info_root / "demo"
@@ -726,6 +739,126 @@ def test_importobjs_doc_helpers_and_doc_info(
     assert "# ruff: noqa: F403" in init_text
     assert 'warnings.simplefilter("ignore", UnknownObjectWarning)' in init_text
     assert "from .demo import *" in init_text
+
+
+def test_append_args_skips_non_lists_and_non_dict_inputs() -> None:
+    """Ensure args helper handles unexpected payloads without mutating lines."""
+    lines: list[str] = []
+
+    _append_args(lines, "oops")
+    assert lines == []
+
+    _append_args(lines, {"required": "wrong", "optional": "wrong"})
+    assert lines == []
+
+
+def test_build_docstring_collects_all_sections() -> None:
+    """Verify the docstring builder runs all append helpers."""
+    obj_info = {
+        "doc": {
+            "digest": "digest value",
+            "description": "long description",
+            "inlets": [{"id": "in1", "type": "signal", "digest": "input"}],
+            "outlets": [{"id": "out1", "type": "signal", "digest": "output"}],
+            "methods": [{"name": "bang"}],
+        },
+        "args": {
+            "required": [{"name": "freq", "type": ["signal"]}],
+            "optional": [{"name": "label", "type": ["symbol"]}],
+        },
+        "attribs": [{"name": "bg"}, {"name": "COMMON"}],
+    }
+
+    docstring = _build_docstring("demo", obj_info)
+    expected = (
+        "demo - digest value\n\n"
+        "long description\n\n"
+        "Args:\n"
+        "freq (signal, required)\n"
+        "label (symbol, optional)\n\n"
+        "Inlets:\n"
+        "in1 (signal): input\n\n"
+        "Outlets:\n"
+        "out1 (signal): output\n\n"
+        "Messages:\n"
+        "bang\n\n"
+        "Attributes:\n"
+        "bg"
+    )
+
+    assert docstring == expected
+
+
+def test_append_methods_returns_when_names_empty() -> None:
+    """Confirm message helper is no-op when no callable names are provided."""
+    lines: list[str] = []
+    _append_methods(lines, [{"name": ""}])
+    assert lines == []
+
+
+def test_io_line_and_wrap_lines_cover_edge_cases() -> None:
+    """Ensure line formatting and wrapping cover both simple and long inputs."""
+    assert _io_line(0, {}) == "0"
+    assert _io_line(1, {"type": "signal"}) == "1 (signal)"
+    assert _io_line(2, {"digest": "bang"}) == "2: bang"
+    assert _io_line(3, {"type": "signal", "digest": "bang"}) == "3 (signal): bang"
+
+    long_entry = " ".join(["x"] * (_DOC_WIDTH + 10))
+    wrapped = _wrap_lines([long_entry], prefix="  ")
+    assert len(wrapped) > 1
+    assert all(line.startswith("  ") for line in wrapped)
+
+
+def test_generate_stubs_creates_objects_and_respects_clean_up(tmp_path: Path) -> None:
+    """Verify the stub generator writes modules for each JSON info file."""
+    package_info = tmp_path / "pkg"
+    package_info.mkdir()
+    (package_info / "foo.json").write_text(
+        json.dumps(
+            {
+                "doc": {
+                    "digest": "digest",
+                    "description": "desc",
+                    "inlets": [{"id": "0", "type": "signal", "digest": "in"}],
+                    "outlets": [{"id": "0", "digest": "out"}],
+                    "methods": [{"name": "method"}],
+                },
+                "args": {"required": [], "optional": []},
+                "attribs": [{"name": "state"}, {"name": "COMMON"}],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    fake_module = tmp_path / "generated_pkg" / "importobjs.py"
+    fake_module.parent.mkdir(parents=True)
+    fake_module.write_text("# stub target", encoding="utf-8")
+    original_file = importobjs.__file__
+    importobjs.__file__ = str(fake_module)
+    objects_dir = fake_module.parent / "objects"
+    try:
+        generate_stubs({"pkg": package_info}, {"pkg": package_info})
+        assert (objects_dir / "pkg.py").exists()
+        assert (objects_dir / "__init__.py").exists()
+        stub_lines = (objects_dir / "pkg.py").read_text(encoding="utf-8")
+        assert "MaxObject('foo')" in stub_lines
+    finally:
+        importobjs.__file__ = original_file
+        if objects_dir.exists():
+            shutil.rmtree(objects_dir)
+
+
+def test_build_objects_init_lines_skips_dunder_init_modules(tmp_path: Path) -> None:
+    """The generated init should not attempt to re-import `__init__` as a stub."""
+    objects_dir = tmp_path / "objects"
+    objects_dir.mkdir()
+    (objects_dir / "__init__.py").write_text("# init", encoding="utf-8")
+    (objects_dir / "demo.py").write_text("# demo", encoding="utf-8")
+
+    init_text = "\n".join(_build_objects_init_lines(objects_dir))
+    assert "from .demo import *" in init_text
+    assert "from .__init__ import *" not in init_text
 
 
 def test_importobjs_doc_and_stub_helpers(

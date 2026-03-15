@@ -1,90 +1,62 @@
-"""
-tools.obj.reffile
-
-Methods that deal with the MaxObject's reference file.
-
-    get_ref() --> find the path to the reference file
-    check_aliases() --> check object name against aliases
-    get_info() --> read the reference file and return MaxObject info
-
-"""
+"""Helpers for resolving and reading Max object reference files."""
 
 from __future__ import annotations
 
 import json
-import os
 import warnings
-from typing import TYPE_CHECKING, Any
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+from maxpylang.exceptions import UnknownObjectWarning
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
-from maxpylang.exceptions import UnknownObjectWarning
+ObjectInfo = dict[str, object]
 
 
 def get_ref(self: MaxObject, name: str) -> str:
-    """
-    Helper function for instantiation.
+    """Return the reference file path or an abstraction marker."""
+    aliased_name = self.check_aliases(name)
+    ref_path: Path | None = None
 
-    Gets path to reference file, if it exists.
-    If it doesn't exist, look for an abstraction file.
-    If no abstraction file, print error and return "not_found"
-    """
-    # check aliases for symbol objs and special objs
-    name = self.check_aliases(name)
+    for package, obj_list in self.known_objs.items():
+        if aliased_name not in obj_list:
+            continue
+        package_folder = Path(self.obj_info_folder) / package
+        ref_path = package_folder / f"{aliased_name}.json"
+        if ref_path.exists():
+            return str(ref_path)
 
-    ref_file = None
+    if ref_path is None:
+        abstraction_path = Path(aliased_name)
+        if abstraction_path.exists() or Path(f"{aliased_name}.maxpat").exists():
+            return "abstraction"
+        warnings.warn(
+            f"Unknown Max object: '{aliased_name}'",
+            UnknownObjectWarning,
+            stacklevel=4,
+        )
+        return "not_found"
 
-    # look through known_objs to find ref_file
-    for (
-        package,
-        obj_list,
-    ) in self.known_objs.items():  # known_objs = { package_name: [list of obj_names] }
-        if name in obj_list:
-            package_folder = os.path.join(self.obj_info_folder, package)
-            ref_file = os.path.join(package_folder, name + ".json")
-            if os.path.exists(ref_file):
-                return ref_file
-
-    if ref_file is None:
-        # look for possible abstraction file in current directory
-        if os.path.exists(name) or os.path.exists(name + ".maxpat"):
-            ref_file = "abstraction"
-        else:
-            warnings.warn(
-                f"Unknown Max object: '{name}'", UnknownObjectWarning, stacklevel=4
-            )
-            ref_file = "not_found"
-
-    return ref_file
+    return str(ref_path)
 
 
 def check_aliases(self: MaxObject, name: str) -> str:
-    """
-    Check name against aliases and return aliased object name, if applicable.
-    """
-    aliases_file = os.path.join(self.obj_info_folder, "obj_aliases.json")
-
-    with open(aliases_file) as f:
-        obj_aliases = json.loads(f.read())
-
-    if name in obj_aliases.keys():
-        name = obj_aliases[name]
-
-    return name
+    """Resolve known aliases for an object name."""
+    aliases_path = Path(self.obj_info_folder) / "obj_aliases.json"
+    obj_aliases = cast(
+        "dict[str, str]",
+        json.loads(aliases_path.read_text(encoding="utf-8")),
+    )
+    return obj_aliases.get(name, name)
 
 
-def get_info(self: MaxObject, ref_file: str | None = None) -> dict[str, Any]:
-    """
-    Helper function.
-
-    Returns dictionary of reference file info.
-    """
-    if ref_file is None:
-        ref_file = self._ref_file
-    assert ref_file is not None
-    # read ref file
-    with open(ref_file) as f:
-        info: dict[str, Any] = json.loads(f.read())
-
-    return info
+def get_info(self: MaxObject, ref_file: str | None = None) -> ObjectInfo:
+    """Read and return a reference file payload."""
+    resolved_ref = self._ref_file if ref_file is None else ref_file
+    if resolved_ref is None:
+        message = "reference file is not set"
+        raise AssertionError(message)
+    ref_path = Path(resolved_ref)
+    return cast("ObjectInfo", json.loads(ref_path.read_text(encoding="utf-8")))

@@ -1,17 +1,15 @@
-"""
-tools.patchfuncs.misc
+"""Miscellaneous MaxPatch helper functions."""
 
-Miscellaneous MaxPatch functions.
-"""
+from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from maxpylang.maxpatch import MaxPatch
 
 
-def add_barebones_obj(self: Any, obj_text: str) -> None:
-    """
-    For importing objs.
-    Place a barebones obj in the patch.
-    """
+def add_barebones_obj(self: MaxPatch, obj_text: str) -> None:
+    """Place a barebones object entry into the patcher dictionary."""
     barebones_obj = {
         "box": {"maxclass": "newobj", "text": obj_text, "patching_rect": [100.0, 100.0]}
     }

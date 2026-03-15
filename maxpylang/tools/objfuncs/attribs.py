@@ -1,152 +1,119 @@
-"""
-tools.obj.attribs
-
-Methods dealing with attribs for MaxObjects.
-
-    add_extra_attribs() --> add extra attributes to the object's dictionary
-
-    get_all_valid_attribs() --> check given text/extra attribs against ref file info, returns valid attribs
-
-        remove_bad_attribs() --> checks attribs against ref file info and removes bad attribs
-
-    retain_attribs() --> retain all possible attribs (extra only) from another MaxObject
-"""
+"""Helpers for validating and applying `MaxObject` attributes."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from .. import typechecks as tc
+from maxpylang.tools import typechecks as tc
+from maxpylang.tools.misc import write_stdout
 
 if TYPE_CHECKING:
     from maxpylang.maxobject import MaxObject
 
+ObjectDict = dict[str, object]
+AttribSpec = dict[str, object]
+AttribSpecList = list[AttribSpec]
 
-def add_extra_attribs(self: MaxObject, extra_attribs: dict[str, Any]) -> None:
-    """
-    Add extra attributes to self dict.
-    """
+
+def add_extra_attribs(self: MaxObject, extra_attribs: ObjectDict) -> None:
+    """Apply extra attributes to the object's backing dictionary."""
     for key, val in extra_attribs.items():
         self._dict["box"][key] = val
 
 
 def get_all_valid_attribs(
     self: MaxObject,
-    text_attribs: dict[str, Any],
-    extra_attribs: dict[str, Any],
-    attrib_info: list[dict[str, Any]],
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """
-    Helper function for instantiation and editing.
+    text_attribs: ObjectDict,
+    extra_attribs: ObjectDict,
+    attrib_info: AttribSpecList,
+) -> tuple[ObjectDict, ObjectDict]:
+    """Filter text and extra attributes against reference metadata."""
+    text_attrib_info = list(attrib_info)
+    if "COMMON" in [attrib["name"] for attrib in attrib_info]:
+        text_attrib_info += self.common_box_attribs
 
-    Removes bad text attributes and bad extra attributes, and returns valid attributes.
+    text_attribs = self.remove_bad_attribs(text_attribs, text_attrib_info)
 
-    *As a general rule, text attributes can only access object-specific attributes.
-    """
-    # first, check text attribs
-    text_attribs = self.remove_bad_attribs(text_attribs, attrib_info)
-
-    # add common box attributes if necessary
     total_attrib_info = list(attrib_info)
-    # add access to patching_rect attrib
     total_attrib_info.append({"name": "patching_rect", "type": "float", "size": "4"})
     if "COMMON" in [attrib["name"] for attrib in attrib_info]:
         total_attrib_info += self.common_box_attribs
 
-    # then, check extra attribs
     extra_attribs = self.remove_bad_attribs(extra_attribs, total_attrib_info)
-
     return text_attribs, extra_attribs
 
 
 def remove_bad_attribs(
     self: MaxObject,
-    attribs: dict[str, Any],
-    attrib_speclist: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """
-    Helper function for getting valid attributes.
+    attribs: ObjectDict,
+    attrib_speclist: AttribSpecList,
+) -> ObjectDict:
+    """Remove unsupported attributes or invalid attribute values."""
+    notvalid: set[str] = set()
+    for attrib, raw_vals in attribs.items():
+        vals = [raw_vals] if isinstance(raw_vals, (int, float)) else raw_vals
 
-    Checks attributes against attribute info and removes nonvalid attributes.
-    """
-    notvalid: list[str] = []
-    for attrib, vals in attribs.items():
-        # make it a list...
-        if isinstance(vals, (int, float)):
-            vals = [vals]
-
-        # check for no value specified
         if len(vals) == 0:
-            print("warning:", self._name, ": no argument given for attribute", attrib)
+            write_stdout(
+                "warning:",
+                self._name,
+                ": no argument given for attribute",
+                attrib,
+            )
             continue
 
-        # look for attrib spec in attrib_speclist
         matching_specs = [spec for spec in attrib_speclist if spec["name"] == attrib]
-
-        # if not found
         if len(matching_specs) == 0:
-            print(
-                "Error:", self._name, ":", attrib, "is not a valid attribute argument"
+            write_stdout(
+                "Error:",
+                self._name,
+                ":",
+                attrib,
+                "is not a valid attribute argument",
             )
-            notvalid.append(attrib)
+            notvalid.add(attrib)
+            continue
 
-        # if found
-        else:
-            attrib_spec = matching_specs[0]
-            # check length of val at least as big as size (reflecting Max behavior...)
-            if len(vals) < int(attrib_spec["size"]):
-                print(
-                    "Error:",
-                    self._name,
-                    ":",
-                    attrib,
-                    "requires",
-                    attrib_spec["size"],
-                    "arguments",
-                )
-                notvalid.append(attrib)
+        attrib_spec = matching_specs[0]
+        if len(vals) < int(attrib_spec["size"]):
+            write_stdout(
+                "Error:",
+                self._name,
+                ":",
+                attrib,
+                "requires",
+                attrib_spec["size"],
+                "arguments",
+            )
+            notvalid.add(attrib)
 
-            # check type for all vals
-            if not all(
-                [
-                    tc.check_type([attrib_spec["type"]], single_val)
-                    for single_val in vals
-                ]
-            ):
-                print(
-                    "Error:",
-                    self._name,
-                    ":",
-                    attrib,
-                    "requires arguments of type",
-                    attrib_spec["type"],
-                )
-                notvalid.append(attrib)
+        if not all(
+            tc.check_type([str(attrib_spec["type"])], single_val) for single_val in vals
+        ):
+            write_stdout(
+                "Error:",
+                self._name,
+                ":",
+                attrib,
+                "requires arguments of type",
+                attrib_spec["type"],
+            )
+            notvalid.add(attrib)
 
-    # remove nonvalid attribs from attribs
     for badattrib in notvalid:
         del attribs[badattrib]
 
     return attribs
 
 
-def retain_attribs(self: MaxObject, other: Any) -> None:
-    """
-    Retain overlapping extra attributes from another MaxObject.
-
-    Used in MaxPatch for replacement.
-    """
-    # get non-normal extra attribs from other obj
+def retain_attribs(self: MaxObject, other: MaxObject) -> None:
+    """Retain overlapping extra attributes from another object."""
     extra_attribs = other.get_extra_attribs()
-
-    # add to obj
     self.edit(**extra_attribs)
 
 
-def get_extra_attribs(self: MaxObject) -> dict[str, Any]:
-    """
-    Get an object's extra attributes from its dictionary.
-    """
+def get_extra_attribs(self: MaxObject) -> ObjectDict:
+    """Return non-default attributes stored on the object."""
     normal = [
         "id",
         "maxclass",
@@ -156,9 +123,6 @@ def get_extra_attribs(self: MaxObject) -> dict[str, Any]:
         "patching_rect",
         "text",
     ]
-    extra_attribs = {}
-    for attrib, val in self._dict["box"].items():
-        if attrib not in normal:
-            extra_attribs[attrib] = val
-
-    return extra_attribs
+    return {
+        attrib: val for attrib, val in self._dict["box"].items() if attrib not in normal
+    }

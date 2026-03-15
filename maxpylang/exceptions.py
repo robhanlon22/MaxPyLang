@@ -1,6 +1,4 @@
-"""
-Custom warning classes for MaxPyLang.
-"""
+"""Custom warning classes for MaxPyLang."""
 
 
 class UnknownObjectWarning(UserWarning):

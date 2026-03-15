@@ -12,7 +12,7 @@ import textwrap
 import time
 import webbrowser
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol, Union
 
 from .maxpatch import MaxPatch
 from .tools.constants import (
@@ -21,6 +21,7 @@ from .tools.constants import (
     obj_info_folder,
     obj_io_folder,
 )
+from .tools.misc import write_stdout
 
 common_box_standin: list[dict[str, str]] = [{"name": "COMMON"}]
 available_argtypes: list[str] = ["int", "symbol", "number", "list", "any", "float"]
@@ -32,6 +33,7 @@ known_aliases: dict[str, str] = {
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
 
 class _ElementLike(Protocol):
     attrib: dict[str, str]
@@ -47,26 +49,32 @@ class _ElementTreeLike(Protocol):
     def getroot(self) -> _ElementLike: ...
 
 
-JSONValue = (
-    str | int | float | bool | None | list["JSONValue"] | dict[str, "JSONValue"]
-)
+JSONValue = Union[
+    str,
+    int,
+    float,
+    bool,
+    None,
+    list["JSONValue"],
+    dict[str, "JSONValue"],
+]
 JSONDict = dict[str, JSONValue]
 PackagePaths = dict[str, Path]
-ArgSpec = dict[str, str | list[str] | int | float | bool | None]
+ArgSpec = dict[str, Union[str, list[str], int, float, bool, None]]
 ArgSections = dict[str, list[ArgSpec]]
 AttribList = list[dict[str, str]]
 ArgStatus = Literal["required", "optional"]
-JSONFileData = (
-    list[JSONDict]
-    | JSONDict
-    | dict[str, str]
-    | list[str]
-    | str
-    | int
-    | float
-    | bool
-    | None
-)
+JSONFileData = Union[
+    list[JSONDict],
+    JSONDict,
+    dict[str, str],
+    list[str],
+    str,
+    int,
+    float,
+    bool,
+    None,
+]
 
 _DOC_WIDTH = 88
 _json_width = 2
@@ -78,7 +86,8 @@ except ModuleNotFoundError:  # pragma: no cover
 
 def import_objs(*packages: str, overwrite: bool = False) -> None:
     """Import objects from MaxMSP packages."""
-    package_paths = get_package_paths(packages)
+    Path(obj_info_folder).mkdir(parents=True, exist_ok=True)
+    package_paths = get_package_paths(list(packages))
     package_info_folders = prep_make_info_folders(
         package_paths,
         overwrite=overwrite,
@@ -119,15 +128,21 @@ def prep_make_info_folders(
     obj_info_root.mkdir(parents=True, exist_ok=True)
 
     package_info_folders: PackagePaths = {}
-    for package, package_path in package_paths.items():
+    for package, package_path_value in package_paths.items():
+        package_path = Path(package_path_value)
         if not package_path.exists():
+            write_stdout("package", package, "not found")
             continue
 
         package_info_folder = obj_info_root / package
         if package_info_folder.exists():
             if not overwrite:
+                write_stdout(package, "previously imported, skipping...")
                 continue
+            write_stdout("prepping to re-import", package)
             shutil.rmtree(package_info_folder)
+        else:
+            write_stdout("prepping to import", package)
 
         package_info_folder.mkdir()
         package_info_folders[package] = package_info_folder
@@ -142,8 +157,10 @@ def save_obj_info(
     """Save per-object default, argument, attribute, and I/O metadata."""
     obj_aliases = dict(known_aliases)
 
-    for package, info_folder in package_info_folders.items():
-        ref_folder = package_paths[package]
+    for package, info_folder_value in package_info_folders.items():
+        write_stdout("importing", package, "objects...")
+        ref_folder = Path(package_paths[package])
+        info_folder = Path(info_folder_value)
         obj_refs = sorted(ref_folder.glob("*.maxref.xml"))
         obj_refs = [ref for ref in obj_refs if not is_unlisted(ref)]
         obj_names = [_object_name_from_ref(ref) for ref in obj_refs]
@@ -164,8 +181,10 @@ def save_obj_info(
                 "doc": obj_doc_info[name],
             }
             _write_json(info_folder / f"{name}.json", obj_info)
+        write_stdout(len(obj_names), "object info files saved")
 
     _write_json(Path(obj_info_folder) / "obj_aliases.json", obj_aliases)
+    write_stdout("object aliases saved successfully")
 
 
 def is_unlisted(ref: Path) -> bool:
@@ -217,7 +236,7 @@ def get_default_obj_info(
 
 def _open_defaults_file(defaults_file: Path) -> None:
     """Open the generated maxpat file for one-shot Max patch evaluation."""
-    webbrowser.open(defaults_file.as_uri())
+    webbrowser.open(defaults_file.resolve().as_uri())
 
 
 def add_barebones_objs(refs: list[Path], patch: MaxPatch) -> None:
@@ -318,11 +337,16 @@ def get_obj_doc_info(refs: list[Path], names: list[str]) -> dict[str, JSONDict]:
     for ref, name in zip(refs, names):
         root = _parse_xml(ref).getroot()
         doc = _read_doc_fields(root)
-        doc["inlets"] = _read_xlet_metadata(root.findall("./inletlist/inlet"))
-        doc["outlets"] = _read_xlet_metadata(root.findall("./outletlist/outlet"))
+        inlets = _read_xlet_metadata(root.findall("./inletlist/inlet"))
+        if inlets:
+            doc["inlets"] = inlets
+        outlets = _read_xlet_metadata(root.findall("./outletlist/outlet"))
+        if outlets:
+            doc["outlets"] = outlets
         methods = root.findall("./methodlist/method")
         method_info = [_read_method_metadata(method) for method in methods]
-        doc["methods"] = method_info
+        if method_info:
+            doc["methods"] = method_info
         obj_doc_info[name] = doc
 
     return obj_doc_info
@@ -532,7 +556,8 @@ def generate_stubs(
     objects_dir = Path(__file__).resolve().parent / "objects"
     objects_dir.mkdir(parents=True, exist_ok=True)
 
-    for package, info_folder in package_info_folders.items():
+    for package, info_folder_value in package_info_folders.items():
+        info_folder = Path(info_folder_value)
         json_files = [
             path
             for path in sorted(info_folder.glob("*.json"))
@@ -552,10 +577,17 @@ def generate_stubs(
             obj_infos[max_name] = obj_info
 
         stub_lines = _build_stub_lines(names_map, obj_infos)
-        (objects_dir / f"{package}.py").write_text("\n".join(stub_lines) + "\n")
+        stub_path = objects_dir / f"{package}.py"
+        stub_path.write_text("\n".join(stub_lines) + "\n")
+        write_stdout(
+            "stub module generated:",
+            f"objects/{package}.py",
+            f"({len(names_map)} objects)",
+        )
 
     init_lines = _build_objects_init_lines(objects_dir)
     (objects_dir / "__init__.py").write_text("\n".join(init_lines) + "\n")
+    write_stdout("stub generation complete")
 
 
 def _build_stub_lines(
@@ -650,6 +682,6 @@ def _write_json(path: Path, data: JSONFileData) -> None:
         json.dump(data, f, indent=_json_width)
 
 
-def _parse_xml(path: Path) -> _ElementTreeLike:
+def _parse_xml(path: str | Path) -> _ElementTreeLike:
     """Parse an XML file with the configured parser."""
-    return _xml_parser.parse(path.as_posix())
+    return _xml_parser.parse(Path(path).as_posix())

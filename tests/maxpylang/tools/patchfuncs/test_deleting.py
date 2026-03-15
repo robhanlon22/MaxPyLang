@@ -1,5 +1,6 @@
 """Tests for patch deletion helpers."""
 
+import pytest
 from _pytest.capture import CaptureFixture
 
 from maxpylang import MaxPatch
@@ -81,3 +82,21 @@ def test_delete_removes_attachments_and_objects_in_one_call(
         verbose=True,
     )
     assert target.__dict__["_dict"]["box"]["id"] not in patch.objs
+
+
+def test_delete_requires_string_identifiers() -> None:
+    """Non-string object identifiers should trigger an assertion."""
+    patch = MaxPatch(verbose=False)
+    assert patch.delete_get_extra_cords("missing") == []
+    with pytest.raises(
+        AssertionError,
+        match="objects to delete must be given as strings",
+    ):
+        patch.delete(objs=[123], verbose=False)
+
+
+def test_delete_cords_requires_valid_pairs() -> None:
+    """Cord deletion expects (Outlet, Inlet) tuples."""
+    patch = MaxPatch(verbose=False)
+    with pytest.raises(AssertionError, match="cords must be specified as"):
+        patch.delete_cords(["wrong", "pair"], verbose=False)

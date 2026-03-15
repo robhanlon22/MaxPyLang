@@ -1,5 +1,5 @@
 """
-maxpylang - Python library for programmatically creating and editing Max/MSP patches (.maxpat files).
+maxpylang public package exports and usage notes.
 
 Quick Start::
 
@@ -25,19 +25,24 @@ Core API
     patch.set_position(new_x, new_y)
 
 - ``place()`` **always returns a list** - use ``[0]`` for a single object.
-- Each connection is ``[outlet, inlet]``: ``patch.connect([obj1.outs[0], obj2.ins[0]])``.
+- Each connection is ``[outlet, inlet]``:
+  ``patch.connect([obj1.outs[0], obj2.ins[0]])``.
 - ``save()`` auto-appends ``.maxpat`` if missing.
 
-Properties: ``patch.objs`` (dict), ``patch.num_objs`` (int), ``patch.curr_position`` (list).
+Properties:
+``patch.objs`` (dict), ``patch.num_objs`` (int), ``patch.curr_position`` (list).
 
 **MaxObject**::
 
     obj = mp.MaxObject("cycle~ 440")
     obj = mp.MaxObject("metro 500 @active 1")   # with attributes
 
-Properties: ``obj.name``, ``obj.ins`` (list of Inlets, 0-indexed), ``obj.outs`` (list of Outlets, 0-indexed).
+Properties:
+``obj.name``, ``obj.ins`` (list of Inlets, 0-indexed), ``obj.outs`` (list of
+Outlets, 0-indexed).
 
-Methods: ``obj.edit(text_add="append", text=None, **extra_attribs)``, ``obj.move(x, y)``.
+Methods:
+``obj.edit(text_add="append", text=None, **extra_attribs)``, ``obj.move(x, y)``.
 
 Stub Objects
 ------------
@@ -62,7 +67,8 @@ Stubs have no arguments. Use string syntax when arguments are needed::
 Available Objects
 -----------------
 
-All valid object names are in ``maxpylang/objects/`` (stubs by package: ``max.py``, ``msp.py``, ``jit.py``).
+All valid object names are in ``maxpylang/objects/`` (stubs by package:
+``max.py``, ``msp.py``, ``jit.py``).
 
 Common objects by category:
 
@@ -178,12 +184,16 @@ Optional, requires Max open::
 
 Vanilla stubs (max, msp, jit) ship with the package.
 Use ``import_objs()`` to add third-party packages or refresh stubs.
+
 """
 
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 from .importobjs import import_objs as import_objs
 from .maxobject import MaxObject as MaxObject
@@ -195,9 +205,10 @@ from .xlet import Outlet as Outlet
 __all__ = ["Inlet", "MaxObject", "MaxPatch", "Outlet", "constants", "import_objs"]
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> ModuleType:
     if name == "objects":
         objects_module = import_module(".objects", __name__)
         globals()["objects"] = objects_module
         return objects_module
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    msg = f"module {__name__!r} has no attribute {name!r}"
+    raise AttributeError(msg)

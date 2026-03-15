@@ -1,3 +1,5 @@
+"""Create a short demonstration patch for attribute inspection."""
+
 import maxpylang as mp
 
 patch = mp.MaxPatch()

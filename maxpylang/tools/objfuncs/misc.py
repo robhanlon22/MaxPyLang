@@ -1,12 +1,4 @@
-"""
-.tools.obj.misc
-
-Miscellaneous functions for the MaxObject class.
-
-    notknown() --> check to see if the object has a reference file
-    __str__(), __repr__() --> printing and rep of object, for info/debugging purposes
-
-"""
+"""Miscellaneous helpers for `MaxObject`."""
 
 from __future__ import annotations
 
@@ -17,27 +9,19 @@ if TYPE_CHECKING:
 
 
 def notknown(self: MaxObject) -> bool:
-    """
-    Return true if the object has no ref_file.
-    """
+    """Return whether the object has no resolved reference file."""
     return self._ref_file is None
 
 
-# def isempty(self):
-# """
-# Returns true if the object is empty; wrapper for notknown(), for clarity.
-# """
-# return self.notknown()
-
-
-def __repr__(self: MaxObject) -> str:
-
+def repr_object(self: MaxObject) -> str:
+    """Return a compact developer-facing object representation."""
     rep = self.name + " ["
-    if "text" in self._dict["box"].keys():
+    if "text" in self._dict["box"]:
         rep += str(self._dict["box"]["text"])
     else:
         rep += str(self._dict["box"]["maxclass"])
-
     rep += "]"
-
     return rep
+
+
+__repr__ = repr_object

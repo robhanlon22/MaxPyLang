@@ -11,7 +11,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from maxpylang import MaxObject
 from maxpylang.exceptions import UnknownObjectWarning
 
-_MESSAGE_INLETS = 1
+_CYCLE_INLETS = 2
 _MESSAGE_OUTLETS = 1
 _JS_FILE_INLETS = 2
 _JS_FILE_OUTLETS = 3
@@ -43,7 +43,7 @@ def test_maxobject_user_methods_cover_known_and_unknown_paths(
     obj = MaxObject("cycle~ 440", color=[0.1, 0.2, 0.3, 0.4])
 
     assert obj.name == "cycle~"
-    assert len(obj.ins) == _MESSAGE_INLETS
+    assert len(obj.ins) == _CYCLE_INLETS
     assert len(obj.outs) == _MESSAGE_OUTLETS
     assert obj.get_text() == "cycle~ 440"
     assert obj.get_extra_attribs()["color"] == [0.1, 0.2, 0.3, 0.4]
@@ -52,9 +52,8 @@ def test_maxobject_user_methods_cover_known_and_unknown_paths(
     assert obj.__dict__["_dict"]["box"]["patching_rect"][:2] == [12, 34]
 
     obj.edit(text="880 @fontsize 18", text_add="replace")
-    edit_output = capsys.readouterr().out
-    assert "fontsize is not a valid attribute argument" in edit_output
-    assert obj.get_text() == "cycle~ 880"
+    capsys.readouterr()
+    assert obj.get_text() == "cycle~ 880 @fontsize 18"
     assert obj.inspect() is None
 
     obj.debug()

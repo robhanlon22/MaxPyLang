@@ -1,150 +1,125 @@
-"""
-tools.patchfuncs.instantiation
+"""Helpers for constructing `MaxPatch` instances."""
 
-Functions for instantiation of a MaxPatch.
-
-    load_template() --> create patch from template
-
-    load_file() --> create patch from existing .maxpat file
-        load_objs_from_dict() --> create objects from existing .maxpat file dict
-        load_patchcords_from_dict() --> create patchcords from existing .maxpat file dict
-        clean_patcher_dict() --> get cleaned patcher dict
-
-"""
+from __future__ import annotations
 
 import json
-import os
-from typing import Any, cast
+import sys
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from maxpylang.maxobject import MaxObject
 
+if TYPE_CHECKING:
+    from maxpylang.maxpatch import MaxPatch
 
-# from template
-def load_template(self: Any, t: str, verbose: bool = True) -> None:
-    """
-    Helper function for instantiation.  GOOD!
-    Loads in a maxpatch template.
+JSONDict = dict[str, object]
 
-    verbose --> log to console
-    """
-    # try to find in patch_templates folder, if it doesn't exist
-    if not os.path.exists(t):
-        t = os.path.join(self.patch_templates_path, t)
-        assert os.path.exists(t), "Error: template file not found"
 
-    # read template
-    with open(t) as f:
-        patch_dict = cast("dict[str, Any]", json.loads(f.read()))
+def _write_stdout(*parts: object) -> None:
+    """Write a space-joined line to stdout."""
+    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
 
-    # save to patch instance
-    self._patcher_dict = patch_dict
 
-    # log...
+def _read_json_dict(path: Path) -> JSONDict:
+    """Read a JSON dictionary from disk."""
+    return cast("JSONDict", json.loads(path.read_text(encoding="utf-8")))
+
+
+def load_template(
+    self: MaxPatch,
+    template: str,
+    *,
+    verbose: bool = True,
+) -> None:
+    """Load a patch template into the patch instance."""
+    template_path = Path(template)
+    if not template_path.exists():
+        template_path = Path(self.patch_templates_path) / template
+        if not template_path.exists():
+            message = "Error: template file not found"
+            raise AssertionError(message)
+
+    self._patcher_dict = _read_json_dict(template_path)
     if verbose:
-        print("Patcher: new patch created from template file:", os.path.split(t)[-1])
+        _write_stdout(
+            "Patcher: new patch created from template file:",
+            template_path.name,
+        )
 
 
-# from file
-def load_file(self: Any, f: str, reorder: bool = True, verbose: bool = True) -> None:
-    """
-    Helper function for instantiation.
-    Loads in an existing .maxpat file.
-
-    reorder --> re-number objects, starting from 1
-    verbose --> log to console
-    """
-    # log...
+def load_file(
+    self: MaxPatch,
+    filename: str,
+    *,
+    reorder: bool = True,
+    verbose: bool = True,
+) -> None:
+    """Load an existing `.maxpat` file into the patch instance."""
+    input_path = Path(filename)
     if verbose:
-        print("Patcher: loading patch from existing file:", os.path.split(f)[-1])
+        _write_stdout("Patcher: loading patch from existing file:", input_path.name)
 
-    # read .maxpat file into dict
-    with open(f) as file:
-        patch_dict = cast("dict[str, Any]", json.loads(file.read()))
-
-    # load in objs
+    patch_dict = _read_json_dict(input_path)
     self.load_objs_from_dict(patch_dict, verbose=verbose)
-
-    # then load in patchcords
     self.load_patchcords_from_dict(patch_dict, verbose=verbose)
-
-    # then load in cleaned patchdict
     self._patcher_dict = self.clean_patcher_dict(patch_dict)
 
-    # reorder objects if necessary
     if reorder:
         self.reorder()
-
-    # log...
     if verbose:
-        print("Patcher: patch loaded from existing file:", os.path.split(f)[-1])
+        _write_stdout("Patcher: patch loaded from existing file:", input_path.name)
 
 
 def load_objs_from_dict(
-    self: Any, patch_dict: dict[str, Any], verbose: bool = True
+    self: MaxPatch,
+    patch_dict: JSONDict,
+    *,
+    verbose: bool = True,
 ) -> None:
-    """
-    Helper function for load_file.
-    Loads in objects from a full patch dict.
-    """
+    """Load box objects from a serialized patch dictionary."""
     self._num_objs = 0
-    # for each obj, make obj from the obj json dict
-    for box in patch_dict["patcher"]["boxes"]:
-        obj = cast("Any", MaxObject)(box, from_dict=True)
-
-        # add obj to patch
+    patcher = cast("dict[str, object]", patch_dict["patcher"])
+    for box in cast("list[object]", patcher["boxes"]):
+        obj = MaxObject(box, from_dict=True)
         self._num_objs += 1
-
-        obj_id = cast("str", cast("dict[str, Any]", obj._dict)["box"]["id"])
-        self._objs[obj_id] = obj
-
+        self._objs[obj.box_id] = obj
         if verbose:
-            print("Patcher:", obj.name, "added, total objects", self._num_objs)
+            _write_stdout("Patcher:", obj.name, "added, total objects", self._num_objs)
 
 
 def load_patchcords_from_dict(
-    self: Any, patch_dict: dict[str, Any], verbose: bool = True
+    self: MaxPatch,
+    patch_dict: JSONDict,
+    *,
+    verbose: bool = True,
 ) -> None:
-    """
-    Helper function for load_file.
-    Loads in patchcords from a patch dict and removes patchcords from patch dict.
-    (must have objs loaded into patch already)
-    """
-    # for each patchcord, make a patchcord connection
-    for line in patch_dict["patcher"]["lines"]:
-        # get source/dest obj/xlet info from patchcord entry...
-        source_obj, source_outlet = (
-            line["patchline"]["source"][0],
-            line["patchline"]["source"][1],
-        )
-        dest_obj, dest_inlet = (
-            line["patchline"]["destination"][0],
-            line["patchline"]["destination"][1],
-        )
-
+    """Load patchcords from a serialized patch dictionary."""
+    patcher = cast("dict[str, object]", patch_dict["patcher"])
+    for line in cast("list[object]", patcher["lines"]):
+        line_dict = cast("dict[str, object]", line)
+        patchline = cast("dict[str, object]", line_dict["patchline"])
+        source = cast("list[object]", patchline["source"])
+        destination = cast("list[object]", patchline["destination"])
         midpoints = [None]
-        if "midpoints" in line["patchline"].keys():
-            midpoints = line["patchline"]["midpoints"]
+        if "midpoints" in patchline:
+            midpoints = cast("list[object]", patchline["midpoints"])
 
-        # make the connection!
+        source_obj = self._objs[cast("str", source[0])]
+        destination_obj = self._objs[cast("str", destination[0])]
         self.connect(
             [
-                self._objs[source_obj].outs[source_outlet],
-                self._objs[dest_obj].ins[dest_inlet],
+                source_obj.outs[cast("int", source[1])],
+                destination_obj.ins[cast("int", destination[1])],
                 midpoints,
             ],
             verbose=verbose,
         )
 
 
-def clean_patcher_dict(self: Any, patch_dict: dict[str, Any]) -> dict[str, Any]:
-    """
-    Helper function for load_file.
-
-    Removes box and line information from the given dict.
-    """
-    # self._patcher_dict doesn't hold box/cord info...
-    # gets added in automatically during saving, so we gotta get rid of it here
-    patch_dict["patcher"]["boxes"] = []
-    patch_dict["patcher"]["lines"] = []
-
+def clean_patcher_dict(self: MaxPatch, patch_dict: JSONDict) -> JSONDict:
+    """Strip box and patchcord data from a patch dictionary."""
+    del self
+    patcher = cast("dict[str, object]", patch_dict["patcher"])
+    patcher["boxes"] = []
+    patcher["lines"] = []
     return patch_dict

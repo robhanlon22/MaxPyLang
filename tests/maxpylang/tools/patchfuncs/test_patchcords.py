@@ -54,6 +54,18 @@ def test_check_connection_exists_reports_existing_and_missing(
     assert patch.check_connection_exists([missing]) == [missing]
 
 
+def test_check_connection_format_requires_midpoint_list() -> None:
+    """Optional midpoint entries must be lists, not scalars."""
+    patch = MaxPatch(verbose=False)
+    source = patch.place("toggle", verbose=False)[0]
+    destination = patch.place("number", verbose=False)[0]
+    with pytest.raises(
+        AssertionError,
+        match="optional midpoints must be specified as list",
+    ):
+        patch.check_connection_format([[source.outs[0], destination.ins[0], "bad"]])
+
+
 def test_swap_patchcords_moves_existing_connections() -> None:
     """Verify swapping a patch object rewires existing patchcord references."""
     patch = MaxPatch(verbose=False)

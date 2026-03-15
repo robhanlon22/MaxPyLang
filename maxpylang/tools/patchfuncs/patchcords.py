@@ -1,61 +1,51 @@
-"""
-tools.patchfuncs.patchcords
-
-Methods related to patchcords in a MaxPatch.
-
-    connect() --> create patchcords connecting objects
-
-    check_connection_format() --> check connections are specified correctly as (Outlet, Inlet, [midpoints]) tuples
-    check_connection_typing() --> check connections are allowed wrt typing *TBD*
-
-    check_connection_exists() --> for deleting - check connection exists
-
-    swap_patchcords() --> for replacing - swap all possible patchcords between two objects
-
-
-"""
+"""Helpers for creating and inspecting patchcords."""
 
 from __future__ import annotations
 
-from typing import Any
+import sys
+from typing import TYPE_CHECKING, cast
 
 from maxpylang.xlet import Inlet, Outlet
 
-Connection = list[Any]
+if TYPE_CHECKING:
+    from maxpylang.maxobject import MaxObject
+    from maxpylang.maxpatch import MaxPatch
+
+Connection = list[object]
+_CONNECTION_WITH_MIDPOINTS = 3
 
 
-# user usage
-def connect(self: Any, *connections: Connection, verbose: bool = True) -> None:
-    """
-    This method creates patchcords to connect objects. *currently fixing connection specification...*
+def _assertion_error(message: str) -> AssertionError:
+    """Build an `AssertionError` instance."""
+    return AssertionError(message)
 
-    :param *connections: a list of connections to make. Each connection must be specified as a tuple \
-    (:class:`~maxpy.Outlet`, :class:`~maxpy.Inlet` (, ``list``)). The optional third element specifies midpoints \
-    (curves) of the patchcord as a list of [x, y] coordinates.
 
-    :param verbose: for logging output.
-    :type verbose: bool, optional; default: True
+def _write_stdout(*parts: object) -> None:
+    """Write a space-joined line to stdout."""
+    sys.stdout.write(" ".join(str(part) for part in parts) + "\n")
 
-    :returns: None
-    """
-    # check correct format, remove incorrectly typed connections
+
+def connect(
+    self: MaxPatch,
+    *connections: Connection,
+    verbose: bool = True,
+) -> None:
+    """Create patchcords between outlets and inlets."""
     self.check_connection_format(connections)
-    connections = self.check_connection_typing(connections)
+    valid_connections = self.check_connection_typing(connections)
 
-    # update inlet sources, outlet destinations, midpoints
-    for connection in connections:
-        inlet = connection[1]
-        outlet = connection[0]
+    for connection in valid_connections:
+        outlet = cast("Outlet", connection[0])
+        inlet = cast("Inlet", connection[1])
         midpoints = [None]
-        if len(connection) == 3:
-            midpoints = connection[2]
+        if len(connection) == _CONNECTION_WITH_MIDPOINTS:
+            midpoints = cast("list[object]", connection[2])
 
-        inlet._sources.append(outlet)
-        inlet._midpoints.append(midpoints)
-        outlet._destinations.append(inlet)
+        inlet.add_source(outlet, midpoints)
+        outlet.add_destination(inlet)
 
         if verbose:
-            print(
+            _write_stdout(
                 "Patcher: connected: (",
                 outlet.parent.name,
                 ": outlet",
@@ -68,103 +58,81 @@ def connect(self: Any, *connections: Connection, verbose: bool = True) -> None:
             )
 
 
-def swap_patchcords(self: Any, new: Any, old: Any) -> None:
-    """
-    Helper function for replace.
-
-    Swaps all possible patchcords from the old object to new object.
-    """
+def swap_patchcords(self: MaxPatch, new: MaxObject, old: MaxObject) -> None:
+    """Swap retained patchcords from an old object to a replacement."""
     new_connections: list[Connection] = []
     old_connections: list[Connection] = []
 
-    # get patchcords coming into remaining inlets
-    for old_in, new_in in zip(old.ins[: len(new.ins)], new.ins):
-        # get all source outlets
-        for source in old_in.sources:
-            # get midpoints associated with this particular source outlet
-            midpoints = old_in._midpoints[old_in.sources.index(source)]
+    for old_inlet, new_inlet in zip(old.ins[: len(new.ins)], new.ins):
+        for source in old_inlet.sources:
+            midpoints = old_inlet.midpoint_for(source)
+            old_connections.append([source, old_inlet, midpoints])
+            new_connections.append([source, new_inlet, midpoints])
 
-            # add connections to lists
-            old_connections.append([source, old_in, midpoints])
-            new_connections.append([source, new_in, midpoints])
+    for old_outlet, new_outlet in zip(old.outs[: len(new.outs)], new.outs):
+        for destination in old_outlet.destinations:
+            midpoints = destination.midpoint_for(old_outlet)
+            old_connections.append([old_outlet, destination, midpoints])
+            new_connections.append([new_outlet, destination, midpoints])
 
-    # get patchcords coming out of remaining outlets
-    for old_out, new_out in zip(old.outs[: len(new.outs)], new.outs):
-        # get all destination inlets
-        for destination in old_out.destinations:
-            # get midpoints associated with this particular destination inlet
-            midpoints = destination._midpoints[destination.sources.index(old_out)]
-
-            # add connections to lists
-            old_connections.append([old_out, destination, midpoints])
-            new_connections.append([new_out, destination, midpoints])
-
-    # delete old connections
     self.delete_cords(*old_connections)
-    # connect new connections
     self.connect(*new_connections)
 
 
 def check_connection_format(
-    self: Any, connections: tuple[Connection, ...] | list[Connection]
+    self: MaxPatch,
+    connections: tuple[Connection, ...] | list[Connection],
 ) -> None:
-    """
-    Helper function for patchcords.
-
-    Checks proper formatting for connection specifications.
-    """
+    """Validate connection formatting."""
+    del self
     for connection in connections:
-        assert (
-            isinstance(connection[0], Outlet)
-            and isinstance(connection[1], Inlet)
-            and "connections must be specified as (Outlet, Inlet, [optional: midpoints])"
+        is_valid_pair = isinstance(connection[0], Outlet) and isinstance(
+            connection[1], Inlet
         )
-        if len(connection) == 3:
-            assert isinstance(connection[2], list), (
-                "optional midpoints must be specified as list"
+        if not is_valid_pair:
+            message = (
+                "connections must be specified as "
+                "(Outlet, Inlet, [optional: midpoints])"
             )
+            raise _assertion_error(message)
+        if len(connection) == _CONNECTION_WITH_MIDPOINTS and not isinstance(
+            connection[2],
+            list,
+        ):
+            message = "optional midpoints must be specified as list"
+            raise _assertion_error(message)
 
 
 def check_connection_typing(
-    self: Any, connections: tuple[Connection, ...] | list[Connection]
+    self: MaxPatch,
+    connections: tuple[Connection, ...] | list[Connection],
 ) -> list[Connection]:
-    """
-    Helper function for patchcords.
-
-    Removes improperly typed connections from list and returns updated list.
-    """
-    ###PLACEHOLDER!
-
+    """Return the currently accepted connections."""
+    del self
     return list(connections)
 
 
 def check_connection_exists(
-    self: Any, connections: tuple[Connection, ...] | list[Connection]
+    self: MaxPatch,
+    connections: tuple[Connection, ...] | list[Connection],
 ) -> list[Connection]:
-    """
-    Helper function for patchcords.
-
-    Removes nonexistent connections from list and returns updated list.
-    """
+    """Filter the connection list to entries that currently exist."""
+    del self
     existing_connections: list[Connection] = []
-
     for connection in connections:
-        outlet = connection[0]
-        inlet = connection[1]
-
-        # check outlet has destination, inlet has source
-        if (inlet in outlet.destinations) and (outlet in inlet.sources):
+        outlet = cast("Outlet", connection[0])
+        inlet = cast("Inlet", connection[1])
+        if inlet in outlet.destinations and outlet in inlet.sources:
             existing_connections.append(connection)
-        else:
-            print(
-                "PatchError:",
-                outlet.parent.name,
-                ": outlet",
-                outlet.index,
-                "not connected to",
-                inlet.parent.name,
-                ": inlet",
-                inlet.index,
-            )
-
+            continue
+        _write_stdout(
+            "PatchError:",
+            outlet.parent.name,
+            ": outlet",
+            outlet.index,
+            "not connected to",
+            inlet.parent.name,
+            ": inlet",
+            inlet.index,
+        )
     return existing_connections
