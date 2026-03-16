@@ -1,4 +1,4 @@
-"""Helpers for validating and coercing `MaxObject` text arguments."""
+"""Argument validation and coercion helpers for ``MaxObject``."""
 
 from __future__ import annotations
 
@@ -28,7 +28,17 @@ def args_valid(
     args: Sequence[Atom],
     arg_info: ArgInfo,
 ) -> bool:
-    """Check text arguments against argument info."""
+    """Check parsed text arguments against imported argument metadata.
+
+    Args:
+        self: Object whose warnings should be controlled by ``arg_warning``.
+        name: Object name used in warning messages.
+        args: Parsed, typed argument values.
+        arg_info: Imported required and optional argument metadata.
+
+    Returns:
+        ``True`` when the provided args satisfy the imported metadata.
+    """
     args_req = arg_info["required"]
     args_opt = arg_info["optional"]
 
@@ -101,7 +111,15 @@ def args_valid(
 
 
 def get_typed_args(_self: MaxObject, args: Sequence[str]) -> list[Atom]:
-    """Convert string arguments into ints or floats when possible."""
+    """Convert string arguments into ints or floats when possible.
+
+    Args:
+        _self: Unused object reference kept for API symmetry.
+        args: Raw string arguments extracted from object text.
+
+    Returns:
+        Typed Python values preserving non-numeric strings as-is.
+    """
     typed_args: list[Atom] = []
     for arg in args:
         if tc.check_int(arg):

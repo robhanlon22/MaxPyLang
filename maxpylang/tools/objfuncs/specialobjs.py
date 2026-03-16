@@ -1,4 +1,4 @@
-"""Helpers for Max special objects such as `js` and abstractions."""
+"""Helpers for Max special objects such as ``js`` and abstractions."""
 
 from __future__ import annotations
 
@@ -25,7 +25,13 @@ def _strip_assignment_value(line: str) -> str:
 
 
 def create_js(self: MaxObject, *, from_dict: bool | None = None) -> None:
-    """Create or refresh a `js` object from args or saved metadata."""
+    """Create or refresh a ``js`` object from args or saved metadata.
+
+    Args:
+        self: Object being initialized.
+        from_dict: Whether to rebuild from saved box metadata instead of
+            parsing the current argument list.
+    """
     if not from_dict:
         filename = self.get_js_filename()
         if filename is None:
@@ -59,7 +65,13 @@ def update_js_from_file(
     filename: str,
     log_var: str | None = None,
 ) -> None:
-    """Update a `js` object from a linked source file."""
+    """Update a ``js`` object from a linked source file.
+
+    Args:
+        self: Object being refreshed.
+        filename: Path to the JavaScript file.
+        log_var: Optional label included in log output.
+    """
     numinlets, numoutlets = self.get_js_io(filename, log_var=log_var)
     self._args = [numoutlets, numinlets, filename]
 
@@ -81,7 +93,17 @@ def get_js_io(
     filename: str,
     log_var: str | None = None,
 ) -> tuple[str | int, str | int]:
-    """Read inlet and outlet counts from a js file."""
+    """Read inlet and outlet counts from a ``js`` file.
+
+    Args:
+        _self: Unused object reference kept for API symmetry.
+        filename: Path to the JavaScript file to inspect.
+        log_var: Optional label included in fallback log messages.
+
+    Returns:
+        A ``(numinlets, numoutlets)`` tuple parsed from the file. When no
+        explicit declarations are present, ``(1, 1)`` is returned.
+    """
     with Path(filename).open(encoding="utf-8") as handle:
         lines = handle.readlines()
 
@@ -122,7 +144,12 @@ def get_js_filename(self: MaxObject) -> str | None:
 
 
 def link_js(self: MaxObject, link_file: str | None = None) -> None:
-    """Link a `js` object to an external source file."""
+    """Link a ``js`` object to an external source file.
+
+    Args:
+        self: Object being linked.
+        link_file: Optional explicit path to the JavaScript file.
+    """
     if link_file is None:
         link_file = str(self._dict["box"]["saved_object_attributes"]["filename"])
         if link_file == "":
@@ -145,7 +172,17 @@ def create_abstraction(
     *,
     from_dict: bool = True,
 ) -> None:
-    """Create or refresh abstraction metadata."""
+    """Create or refresh abstraction metadata.
+
+    Args:
+        self: Object being initialized.
+        text: Raw object text when building from specs.
+        extra_attribs: Extra attributes to preserve on the abstraction box.
+        from_dict: Whether to rebuild from saved box metadata.
+
+    Raises:
+        AssertionError: If ``from_dict`` is false and ``text`` is missing.
+    """
     self._ext_file = self.name
     if ".maxpat" not in self.name:
         self._ext_file += ".maxpat"
@@ -172,7 +209,14 @@ def update_abstraction_from_file(
     extra_attribs: dict[str, Any] | None,
     log_var: str | None = None,
 ) -> None:
-    """Refresh abstraction I/O and attributes from the linked file."""
+    """Refresh abstraction I/O and attributes from the linked file.
+
+    Args:
+        self: Object being refreshed.
+        text: Object text to store on the rebuilt box.
+        extra_attribs: Extra attributes to validate and preserve.
+        log_var: Optional label included in log output.
+    """
     numinlets, numoutlets = self.get_abstraction_io()
     extra_attribs = extra_attribs or {}
 
@@ -200,7 +244,15 @@ def create_declared_abstraction(
     numoutlets: int,
     extra_attribs: dict[str, Any],
 ) -> None:
-    """Create an abstraction with user-declared inlet and outlet counts."""
+    """Create an abstraction with user-declared inlet and outlet counts.
+
+    Args:
+        self: Object being initialized.
+        text: Raw object text.
+        numinlets: Declared inlet count.
+        numoutlets: Declared outlet count.
+        extra_attribs: Extra validated box attributes.
+    """
     self._ext_file = self.name
     if ".maxpat" not in self.name:
         self._ext_file += ".maxpat"
@@ -223,7 +275,17 @@ def create_declared_abstraction(
 
 
 def get_abstraction_io(self: MaxObject) -> tuple[int, int]:
-    """Return the inlet and outlet counts in the linked abstraction file."""
+    """Return the inlet and outlet counts in the linked abstraction file.
+
+    Args:
+        self: Object whose linked abstraction should be inspected.
+
+    Returns:
+        A ``(numinlets, numoutlets)`` tuple counted from the abstraction file.
+
+    Raises:
+        AssertionError: If the object is not linked to an abstraction file.
+    """
     if self._ext_file is None:
         message = "abstraction file must be linked before I/O can be read"
         raise AssertionError(message)
@@ -243,7 +305,12 @@ def get_abstraction_io(self: MaxObject) -> tuple[int, int]:
 
 
 def link_abstraction(self: MaxObject, link_file: str | None = None) -> None:
-    """Link an object to an external abstraction file."""
+    """Link an object to an external abstraction file.
+
+    Args:
+        self: Object being linked.
+        link_file: Optional explicit path to the abstraction file.
+    """
     if link_file is None:
         link_file = self.name
 

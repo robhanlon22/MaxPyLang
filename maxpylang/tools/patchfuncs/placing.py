@@ -1,4 +1,4 @@
-"""Helpers for placing objects in a `MaxPatch`."""
+"""Placement helpers used by :class:`maxpylang.maxpatch.MaxPatch`."""
 
 from __future__ import annotations
 
@@ -234,7 +234,18 @@ def _normalize_starting_pos(starting_pos: Position | None) -> Position | None:
 
 
 def place(self: MaxPatch, *objs: ObjectSpec, **options: object) -> list[MaxObject]:
-    """Place objects into the patch."""
+    """Place objects into the patch using one of the supported layouts.
+
+    Args:
+        self: Patch receiving the objects.
+        *objs: Object specifications to place.
+        **options: Placement options such as ``randpick``, ``num_objs``,
+            ``seed``, ``weights``, ``spacing_type``, ``spacing``,
+            ``starting_pos``, and ``verbose``.
+
+    Returns:
+        The placed objects in creation order.
+    """
     randpick = _bool_option(options, "randpick", default=False)
     num_objs = cast("CountSpec", options.pop("num_objs", 1))
     seed = _optional_int_option(options, "seed")
@@ -298,7 +309,17 @@ def place_check_args(
     *args: object,
     **options: object,
 ) -> tuple[CountSpec, Position | None]:
-    """Validate placement arguments and normalize the result."""
+    """Validate placement arguments and normalize the result.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Candidate object specifications.
+        *args: Legacy positional placement arguments.
+        **options: Placement options mirrored from ``place``.
+
+    Returns:
+        A normalized ``(num_objs, starting_pos)`` tuple.
+    """
     del self
     _apply_legacy_args(options, args, _LEGACY_PLACE_CHECK_ARGS, "place_check_args")
 
@@ -342,7 +363,17 @@ def place_pick_objs(
     *args: object,
     **options: object,
 ) -> list[ObjectSpec]:
-    """Expand or randomly choose the object specs to place."""
+    """Expand or randomly choose the object specs to place.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Candidate object specifications.
+        *args: Legacy positional selection arguments.
+        **options: Selection options mirrored from ``place``.
+
+    Returns:
+        A concrete list of object specs ready for layout.
+    """
     del self
     _apply_legacy_args(options, args, _LEGACY_PLACE_PICK_ARGS, "place_pick_objs")
 
@@ -388,7 +419,17 @@ def place_grid(
     spacing: Position,
     **options: object,
 ) -> list[MaxObject]:
-    """Place objects on a grid."""
+    """Place objects on a grid derived from the patch cursor.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Object specifications to place.
+        spacing: Horizontal and vertical grid spacing.
+        **options: Keyword options. Supported key is ``verbose``.
+
+    Returns:
+        The placed objects.
+    """
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
     _LOGGER.debug(
@@ -426,7 +467,17 @@ def place_random(
     seed: int,
     **options: object,
 ) -> list[MaxObject]:
-    """Place objects at random patcher positions."""
+    """Place objects at random positions on the patch canvas.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Object specifications to place.
+        seed: Seed for NumPy's random generator.
+        **options: Keyword options. Supported key is ``verbose``.
+
+    Returns:
+        The placed objects.
+    """
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
     _LOGGER.debug("Patcher: placing %s objects randomly with seed %s", len(objs), seed)
@@ -448,7 +499,17 @@ def place_custom(
     positions: Positions,
     **options: object,
 ) -> list[MaxObject]:
-    """Place objects at explicit positions."""
+    """Place objects at explicit positions.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Object specifications to place.
+        positions: One coordinate pair per object.
+        **options: Keyword options. Supported key is ``verbose``.
+
+    Returns:
+        The placed objects.
+    """
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
     _LOGGER.debug(
@@ -474,7 +535,17 @@ def place_vertical(
     spacing: float,
     **options: object,
 ) -> list[MaxObject]:
-    """Place objects vertically."""
+    """Place objects vertically from the current cursor position.
+
+    Args:
+        self: Patch receiving the objects.
+        objs: Object specifications to place.
+        spacing: Vertical distance between successive objects.
+        **options: Keyword options. Supported key is ``verbose``.
+
+    Returns:
+        The placed objects.
+    """
     verbose = _bool_option(options, "verbose", default=False)
     _assert_no_options(options)
     _LOGGER.debug(
@@ -503,7 +574,19 @@ def place_obj(
     *args: object,
     **options: object,
 ) -> MaxObject:
-    """Place one object into the patch."""
+    """Place a single object into the patch.
+
+    Args:
+        self: Patch receiving the object.
+        obj: Object specification to place.
+        position: Target ``[x, y]`` location.
+        *args: Legacy positional ``verbose`` and ``replace_id`` arguments.
+        **options: Keyword options. Supported keys are ``verbose`` and
+            ``replace_id``.
+
+    Returns:
+        The placed object instance.
+    """
     _apply_legacy_args(options, args, _LEGACY_PLACE_OBJECT_ARGS, "place_obj")
     _bool_option(options, "verbose", default=False)
     replace_id = cast("str | None", options.pop("replace_id", None))

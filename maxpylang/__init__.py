@@ -1,5 +1,4 @@
-"""
-maxpylang public package exports and usage notes.
+"""maxpylang public package exports and usage notes.
 
 Quick Start::
 
@@ -142,7 +141,8 @@ Key Rules
 - ``place()`` **always returns a list** - use ``[0]`` for single objects.
 - Object names are **case-sensitive** and must match Max names exactly.
 - Coordinates are floats. Inlet/outlet indices are **0-based**.
-- ``save()`` auto-appends ``.maxpat``. ``verbose=False`` suppresses console output.
+- ``save()`` auto-appends ``.maxpat``. Verbose activity is emitted through Python
+  logging rather than ``stdout``.
 - **Typos raise UnknownObjectWarning** - if you see this warning, fix the object name
   immediately. The object will have 0 inlets/outlets and won't work.
   Use ``obj.notknown()`` to check programmatically.

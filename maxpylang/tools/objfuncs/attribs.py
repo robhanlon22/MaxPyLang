@@ -1,4 +1,4 @@
-"""Helpers for validating and applying `MaxObject` attributes."""
+"""Attribute validation and application helpers for ``MaxObject``."""
 
 from __future__ import annotations
 
@@ -18,7 +18,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def add_extra_attribs(self: MaxObject, extra_attribs: ObjectDict) -> None:
-    """Apply extra attributes to the object's backing dictionary."""
+    """Apply extra attributes to the object's backing dictionary.
+
+    Args:
+        self: Object being mutated.
+        extra_attribs: Validated attributes to apply directly to the box dict.
+    """
     for key, val in extra_attribs.items():
         self._dict["box"][key] = val
 
@@ -29,7 +34,17 @@ def get_all_valid_attribs(
     extra_attribs: ObjectDict,
     attrib_info: AttribSpecList,
 ) -> tuple[ObjectDict, ObjectDict]:
-    """Filter text and extra attributes against reference metadata."""
+    """Filter text and extra attributes against reference metadata.
+
+    Args:
+        self: Object whose metadata should be consulted.
+        text_attribs: Attributes expressed inside the object text.
+        extra_attribs: Additional box attributes supplied separately.
+        attrib_info: Imported attribute metadata.
+
+    Returns:
+        A tuple of ``(valid_text_attribs, valid_extra_attribs)``.
+    """
     text_attrib_info = list(attrib_info)
     if "COMMON" in [attrib["name"] for attrib in attrib_info]:
         text_attrib_info += self.common_box_attribs
@@ -50,7 +65,16 @@ def remove_bad_attribs(
     attribs: ObjectDict,
     attrib_speclist: AttribSpecList,
 ) -> ObjectDict:
-    """Remove unsupported attributes or invalid attribute values."""
+    """Remove unsupported attributes or invalid attribute values.
+
+    Args:
+        self: Object whose metadata should be consulted.
+        attribs: Candidate attributes to validate.
+        attrib_speclist: Imported attribute specifications.
+
+    Returns:
+        The filtered attribute dictionary after invalid entries are removed.
+    """
     notvalid: set[str] = set()
     for attrib, raw_vals in attribs.items():
         vals = raw_vals if isinstance(raw_vals, list) else [raw_vals]
@@ -101,13 +125,25 @@ def remove_bad_attribs(
 
 
 def retain_attribs(self: MaxObject, other: MaxObject) -> None:
-    """Retain overlapping extra attributes from another object."""
+    """Retain overlapping extra attributes from another object.
+
+    Args:
+        self: Object receiving attributes.
+        other: Object supplying attributes.
+    """
     extra_attribs = other.get_extra_attribs()
     self.edit(**extra_attribs)
 
 
 def get_extra_attribs(self: MaxObject) -> ObjectDict:
-    """Return non-default attributes stored on the object."""
+    """Return non-default attributes stored on the object.
+
+    Args:
+        self: Object to inspect.
+
+    Returns:
+        A dictionary of box attributes not part of Max's standard box fields.
+    """
     normal = [
         "id",
         "maxclass",

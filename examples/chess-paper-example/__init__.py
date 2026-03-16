@@ -1,0 +1,1 @@
+"""Chess paper example package."""

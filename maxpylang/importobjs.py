@@ -1,4 +1,9 @@
-"""Utilities for importing Max object metadata and generating object stubs."""
+"""Import Max reference metadata and generate Python object stubs.
+
+This module parses Max reference XML, extracts object metadata, writes the
+normalized JSON files consumed by ``MaxObject``, and generates the
+``maxpylang.objects`` stub modules used for autocomplete-friendly constants.
+"""
 
 from __future__ import annotations
 
@@ -68,7 +73,14 @@ except ModuleNotFoundError:  # pragma: no cover
 
 
 def import_objs(*packages: str, overwrite: bool = False) -> None:
-    """Import objects from MaxMSP packages."""
+    """Import metadata and regenerate stubs for one or more Max packages.
+
+    Args:
+        *packages: Package names to import. Passing ``"vanilla"`` expands to
+            the built-in ``max``, ``msp``, and ``jit`` packages.
+        overwrite: Whether to replace any existing imported metadata for the
+            requested packages.
+    """
     Path(obj_info_folder).mkdir(parents=True, exist_ok=True)
     package_paths = get_package_paths(list(packages))
     package_info_folders = prep_make_info_folders(
@@ -80,7 +92,15 @@ def import_objs(*packages: str, overwrite: bool = False) -> None:
 
 
 def get_package_paths(packages: Iterable[str]) -> PackagePaths:
-    """Build filesystem locations for Max package reference files."""
+    """Resolve package names to Max reference-documentation directories.
+
+    Args:
+        packages: Requested package names. ``"vanilla"`` is expanded into the
+            built-in Max package set.
+
+    Returns:
+        Mapping of package name to reference-doc directory.
+    """
     vanilla_refpath = Path(cast("str", get_constant("max_refpath")))
     packages_refpath = Path(cast("str", get_constant("packages_path")))
 
@@ -106,7 +126,16 @@ def prep_make_info_folders(
     *,
     overwrite: bool = False,
 ) -> PackagePaths:
-    """Prepare obj-info output folders for imported packages."""
+    """Prepare destination folders for imported object metadata.
+
+    Args:
+        package_paths: Mapping of package names to source documentation paths.
+        overwrite: Whether existing metadata folders should be replaced.
+
+    Returns:
+        Mapping of package names to metadata output folders that should be
+        written during this import pass.
+    """
     obj_info_root = Path(obj_info_folder)
     obj_info_root.mkdir(parents=True, exist_ok=True)
 
@@ -137,7 +166,13 @@ def save_obj_info(
     package_paths: PackagePaths,
     package_info_folders: PackagePaths,
 ) -> None:
-    """Save per-object default, argument, attribute, and I/O metadata."""
+    """Persist normalized JSON metadata for each imported object.
+
+    Args:
+        package_paths: Mapping of package names to source documentation paths.
+        package_info_folders: Mapping of package names to destination metadata
+            folders created by ``prep_make_info_folders``.
+    """
     obj_aliases = dict(known_aliases)
 
     for package, info_folder_value in package_info_folders.items():
@@ -194,7 +229,16 @@ def get_default_obj_info(
     refs: list[Path],
     names: list[str],
 ) -> dict[str, JSONDict]:
-    """Place objects in a patch and extract saved default arguments."""
+    """Capture default saved-state metadata by instantiating each object.
+
+    Args:
+        package: Package name used to name the temporary patch file.
+        refs: XML reference files for the objects being imported.
+        names: Object names aligned with ``refs``.
+
+    Returns:
+        Mapping of object name to the saved default Max box dictionary.
+    """
     wait_time = float(cast("str | int | float", get_constant("wait_time")))
     patch = MaxPatch(verbose=False)
     add_save_close(patch)
@@ -223,14 +267,23 @@ def _open_defaults_file(defaults_file: Path) -> None:
 
 
 def add_barebones_objs(refs: list[Path], patch: MaxPatch) -> None:
-    """Add a barebones instance of every object into patch for metadata export."""
+    """Add one minimally configured instance of every referenced object.
+
+    Args:
+        refs: XML reference files describing the objects to instantiate.
+        patch: Temporary patch used to save out default object state.
+    """
     for ref in refs:
         root = _parse_xml(ref).getroot()
         patch.add_barebones_obj(root.attrib["name"])
 
 
 def add_save_close(patch: MaxPatch) -> None:
-    """Add template objects that save and close the patch."""
+    """Inject helper objects that save and close the temporary patch.
+
+    Args:
+        patch: Temporary patch used while importing object defaults.
+    """
     tools = _read_json(Path(import_tools))
     patcher = patch.__dict__["_patcher_dict"]
     patcher["patcher"]["boxes"] = tools["boxes"]
@@ -312,7 +365,16 @@ def strip_xml_text(element: _ElementLike | None) -> str:
 
 
 def get_obj_doc_info(refs: list[Path], names: list[str]) -> dict[str, JSONDict]:
-    """Extract documentation metadata from XML reference files."""
+    """Extract human-readable documentation fields from XML references.
+
+    Args:
+        refs: XML reference files to parse.
+        names: Object names aligned with ``refs``.
+
+    Returns:
+        Mapping of object name to digest, description, inlet, outlet, and
+        message metadata.
+    """
     obj_doc_info: dict[str, JSONDict] = {}
 
     for ref, name in zip(refs, names):
@@ -375,7 +437,14 @@ def _set_optional_text(target: JSONDict, key: str, node: _ElementLike | None) ->
 
 
 def sanitize_py_name(max_name: str) -> str:
-    """Convert a Max object name to a valid Python identifier."""
+    """Convert a Max object name to a valid Python identifier.
+
+    Args:
+        max_name: Raw Max object name such as ``cycle~`` or ``jit.movie``.
+
+    Returns:
+        A Python-safe constant name suitable for generated stubs.
+    """
     name = max_name.replace("~", "_tilde")
     name = name.replace(".", "_").replace("-", "_")
     if name and name[0].isdigit():
@@ -386,7 +455,15 @@ def sanitize_py_name(max_name: str) -> str:
 
 
 def _build_docstring(max_name: str, obj_info: JSONDict) -> str:
-    """Build a short wrapped docstring for a generated object constant."""
+    """Build the generated docstring attached to an object stub constant.
+
+    Args:
+        max_name: Original Max object name.
+        obj_info: Imported metadata for the object.
+
+    Returns:
+        Wrapped docstring text suitable for embedding in generated Python code.
+    """
     doc = obj_info.get("doc", {})
     args = obj_info.get("args", {})
     attribs = obj_info.get("attribs", [])
@@ -533,7 +610,13 @@ def generate_stubs(
     _package_paths: PackagePaths,
     package_info_folders: PackagePaths,
 ) -> None:
-    """Write generated object stub modules for each imported package."""
+    """Generate ``maxpylang.objects`` modules from imported metadata.
+
+    Args:
+        _package_paths: Unused legacy argument preserved for API compatibility.
+        package_info_folders: Mapping of package names to imported metadata
+            folders that should be converted into Python stub modules.
+    """
     objects_dir = Path(__file__).resolve().parent / "objects"
     objects_dir.mkdir(parents=True, exist_ok=True)
 
@@ -575,7 +658,15 @@ def _build_stub_lines(
     names_map: dict[str, str],
     obj_infos: dict[str, JSONDict],
 ) -> list[str]:
-    """Compose the Python source for a single package stub module."""
+    """Compose the Python source lines for one generated stub module.
+
+    Args:
+        names_map: Mapping of Python-safe stub names to original Max names.
+        obj_infos: Imported metadata keyed by original Max name.
+
+    Returns:
+        Source lines for the generated module.
+    """
     all_names = sorted(names_map)
     lines = [
         '"""Generated MaxObject stubs."""',

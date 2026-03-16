@@ -1,4 +1,4 @@
-"""Helpers for creating and inspecting patchcords."""
+"""Patchcord helpers used by :class:`maxpylang.maxpatch.MaxPatch`."""
 
 from __future__ import annotations
 
@@ -26,7 +26,14 @@ def connect(
     *connections: Connection,
     verbose: bool = True,
 ) -> None:
-    """Create patchcords between outlets and inlets."""
+    """Create patchcords between outlets and inlets.
+
+    Args:
+        self: Patch receiving the new connections.
+        *connections: Connection pairs or triplets in
+            ``[Outlet, Inlet, midpoints?]`` form.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     del verbose
     self.check_connection_format(connections)
     valid_connections = self.check_connection_typing(connections)
@@ -50,7 +57,13 @@ def connect(
 
 
 def swap_patchcords(self: MaxPatch, new: MaxObject, old: MaxObject) -> None:
-    """Swap retained patchcords from an old object to a replacement."""
+    """Move compatible patchcords from one object to another.
+
+    Args:
+        self: Patch containing the objects.
+        new: Replacement object that should inherit patchcords.
+        old: Object being replaced.
+    """
     new_connections: list[Connection] = []
     old_connections: list[Connection] = []
 
@@ -74,7 +87,16 @@ def check_connection_format(
     self: MaxPatch,
     connections: tuple[Connection, ...] | list[Connection],
 ) -> None:
-    """Validate connection formatting."""
+    """Validate patchcord connection formatting.
+
+    Args:
+        self: Unused patch reference kept for API symmetry.
+        connections: Connection specs to validate.
+
+    Raises:
+        AssertionError: If any connection is not expressed as
+            ``(Outlet, Inlet, [optional midpoints])``.
+    """
     del self
     for connection in connections:
         is_valid_pair = isinstance(connection[0], Outlet) and isinstance(
@@ -98,7 +120,15 @@ def check_connection_typing(
     self: MaxPatch,
     connections: tuple[Connection, ...] | list[Connection],
 ) -> list[Connection]:
-    """Return the currently accepted connections."""
+    """Return the connections currently accepted by the typing rules.
+
+    Args:
+        self: Unused patch reference kept for API symmetry.
+        connections: Candidate connections.
+
+    Returns:
+        The subset of connections accepted by the current typing rules.
+    """
     del self
     return list(connections)
 
@@ -107,7 +137,15 @@ def check_connection_exists(
     self: MaxPatch,
     connections: tuple[Connection, ...] | list[Connection],
 ) -> list[Connection]:
-    """Filter the connection list to entries that currently exist."""
+    """Filter the connection list to entries that currently exist.
+
+    Args:
+        self: Unused patch reference kept for API symmetry.
+        connections: Candidate existing connections.
+
+    Returns:
+        Only the connections that are currently present in the patch.
+    """
     del self
     existing_connections: list[Connection] = []
     for connection in connections:

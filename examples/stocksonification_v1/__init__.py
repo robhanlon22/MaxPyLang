@@ -1,0 +1,1 @@
+"""Stock sonification example package."""

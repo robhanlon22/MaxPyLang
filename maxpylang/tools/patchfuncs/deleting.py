@@ -1,4 +1,4 @@
-"""Helpers for deleting patch objects and patchcords."""
+"""Deletion helpers used by :class:`maxpylang.maxpatch.MaxPatch`."""
 
 from __future__ import annotations
 
@@ -28,7 +28,18 @@ def delete(
     *,
     verbose: bool = True,
 ) -> None:
-    """Delete objects and/or patchcords from the patch."""
+    """Delete objects and/or patchcords from the patch.
+
+    Args:
+        self: Patch to mutate.
+        objs: Object ids to delete.
+        cords: Patchcord specs to delete.
+        verbose: Legacy compatibility flag retained for the public API.
+
+    Raises:
+        AssertionError: If any object identifier is not a string or if any
+            connection spec is malformed.
+    """
     obj_ids = list(objs or [])
     cord_list = list(cords or [])
 
@@ -45,7 +56,15 @@ def delete(
 
 
 def delete_get_extra_cords(self: MaxPatch, *objs: str) -> list[Connection]:
-    """Return patchcords attached to the objects being deleted."""
+    """Collect patchcords incident to the objects being deleted.
+
+    Args:
+        self: Patch to inspect.
+        *objs: Object ids that may be removed.
+
+    Returns:
+        Connection specs that should be deleted alongside the objects.
+    """
     cords: list[Connection] = []
     for obj_id in objs:
         if obj_id not in self._objs:
@@ -61,7 +80,17 @@ def delete_get_extra_cords(self: MaxPatch, *objs: str) -> list[Connection]:
 
 
 def delete_cords(_self: MaxPatch, *cords: Connection, verbose: bool = True) -> None:
-    """Delete patchcords from the patch."""
+    """Delete patchcords from the patch.
+
+    Args:
+        _self: Unused patch reference kept for API symmetry.
+        *cords: Connection specs to delete.
+        verbose: Legacy compatibility flag retained for the public API.
+
+    Raises:
+        AssertionError: If a connection is not expressed as an outlet/inlet
+            pair.
+    """
     del verbose
     for cord in cords:
         outlet = cord[0]
@@ -82,7 +111,13 @@ def delete_cords(_self: MaxPatch, *cords: Connection, verbose: bool = True) -> N
 
 
 def delete_objs(self: MaxPatch, *objs: str, verbose: bool = True) -> None:
-    """Delete objects and any attached patchcords."""
+    """Delete objects and any attached patchcords.
+
+    Args:
+        self: Patch to mutate.
+        *objs: Object ids to remove.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     del verbose
     obj_ids = list(objs)
     for obj_id in obj_ids.copy():

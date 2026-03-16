@@ -1,4 +1,4 @@
-"""Expose the `MaxPatch` facade."""
+"""Public facade for building, editing, and serializing Max patchers."""
 
 from __future__ import annotations
 
@@ -66,7 +66,13 @@ def _assert_no_options(options: dict[str, object]) -> None:
 
 
 class MaxPatch:
-    """Represent a Max patcher."""
+    """Represent a Max patcher and the objects it contains.
+
+    Instances keep track of placed objects, patchcords, and the current
+    placement cursor. Most public methods are thin convenience wrappers around
+    the implementation modules under ``maxpylang.tools.patchfuncs`` so callers
+    can work with a single, stable facade.
+    """
 
     patch_templates_path = _constants.patch_templates_path
 
@@ -77,7 +83,23 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> None:
-        """Initialize a patch from a template or an existing file."""
+        """Initialize a patch from a template or an existing file.
+
+        Args:
+            template: Path to a template JSON file. When omitted and
+                ``load_file`` is not provided, the bundled empty template is
+                used.
+            load_file: Existing ``.maxpat`` file to load instead of starting
+                from a template.
+            *args: Legacy positional flags mapped to ``reorder`` and
+                ``verbose`` for backwards compatibility.
+            **options: Keyword options. Supported keys are ``reorder`` and
+                ``verbose``.
+
+        Raises:
+            TypeError: If too many legacy positional flags are supplied or a
+                supported option has the wrong type.
+        """
         if len(args) > _MAX_LEGACY_FLAGS:
             message = "MaxPatch accepts at most two legacy positional flags"
             raise _type_error(message)
@@ -132,7 +154,17 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> None:
-        """Load a patch from a template file."""
+        """Load patcher state from a template JSON file.
+
+        Args:
+            template: Path to the template file to load.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+
+        Raises:
+            TypeError: If an unsupported option is supplied or a flag has the
+                wrong type.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=True)
@@ -145,7 +177,19 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> None:
-        """Load a patch from an existing `.maxpat` file."""
+        """Load patch data from an existing ``.maxpat`` file.
+
+        Args:
+            filename: Path to the patch file on disk.
+            *args: Legacy positional flags mapped to ``reorder`` and
+                ``verbose``.
+            **options: Keyword options. Supported keys are ``reorder`` and
+                ``verbose``.
+
+        Raises:
+            TypeError: If too many legacy flags are supplied or a supported
+                option has the wrong type.
+        """
         if len(args) > _MAX_LEGACY_FLAGS:
             message = "load_file accepts at most two legacy positional flags"
             raise _type_error(message)
@@ -262,7 +306,19 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> None:
-        """Serialize the patch to disk."""
+        """Serialize the patch to disk.
+
+        Args:
+            filename: Output path. ``.maxpat`` is appended automatically when
+                needed.
+            *args: Legacy positional flags mapped to ``verbose`` and ``check``.
+            **options: Keyword options. Supported keys are ``verbose`` and
+                ``check``.
+
+        Raises:
+            TypeError: If too many legacy flags are supplied or a supported
+                option has the wrong type.
+        """
         if len(args) > _MAX_LEGACY_FLAGS:
             message = "save accepts at most two legacy positional flags"
             raise _type_error(message)
@@ -277,11 +333,33 @@ class MaxPatch:
         _saving.save(self, filename=filename, verbose=verbose, check=check)
 
     def get_json(self) -> JSONDict:
-        """Return the serialized patch dictionary."""
+        """Return the current patch as a Max-compatible dictionary.
+
+        Returns:
+            The serialized patcher structure, including object boxes and
+            patchcord lines.
+        """
         return _saving.get_json(self)
 
     def place(self, *objs: _placing.ObjectSpec, **options: object) -> list[MaxObject]:
-        """Place objects in the patch."""
+        """Create one or more objects and place them in the patch.
+
+        Args:
+            *objs: Object specifications. Each item can be an object text
+                string, an existing ``MaxObject``, or a compatible legacy list
+                spec.
+            **options: Placement controls such as ``randpick``, ``num_objs``,
+                ``seed``, ``weights``, ``spacing_type``, ``spacing``,
+                ``starting_pos``, and ``verbose``.
+
+        Returns:
+            The newly placed ``MaxObject`` instances in placement order.
+
+        Raises:
+            AssertionError: If placement arguments are structurally invalid.
+            TypeError: If option types are invalid or unsupported options are
+                supplied.
+        """
         randpick = _bool_option(options, "randpick", default=False)
         num_objs = options.pop("num_objs", 1)
         seed = _optional_int_option(options, "seed")
@@ -310,7 +388,21 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> tuple[_placing.CountSpec, _placing.Position | None]:
-        """Validate placement options before object creation."""
+        """Normalize and validate placement options without placing objects.
+
+        Args:
+            objs: Object specifications that would be passed to ``place``.
+            *args: Legacy positional placement arguments.
+            **options: Placement options mirrored from ``place``.
+
+        Returns:
+            A tuple of ``(num_objs, starting_pos)`` after normalization.
+
+        Raises:
+            AssertionError: If the placement combination is not valid.
+            TypeError: If option types are invalid or unexpected options are
+                supplied.
+        """
         legacy_names = (
             "randpick",
             "num_objs",
@@ -355,7 +447,22 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> list[_placing.ObjectSpec]:
-        """Expand or randomly choose the objects to place."""
+        """Expand repeated object specs or randomly pick from them.
+
+        Args:
+            objs: Candidate object specifications.
+            *args: Legacy positional selection arguments.
+            **options: Selection options mirrored from ``place``.
+
+        Returns:
+            A concrete list of object specifications ready for placement.
+
+        Raises:
+            AssertionError: If the selection arguments are internally
+                inconsistent.
+            TypeError: If option types are invalid or unexpected options are
+                supplied.
+        """
         legacy_names = ("randpick", "num_objs", "seed", "weights", "verbose")
         if len(args) > len(legacy_names):
             message = "too many positional arguments for place_pick_objs"
@@ -386,7 +493,17 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> list[MaxObject]:
-        """Place objects on the patcher grid."""
+        """Place objects on a grid using the current cursor as an origin.
+
+        Args:
+            objs: Object specifications to place.
+            spacing: Horizontal and vertical grid spacing.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+
+        Returns:
+            The newly placed objects.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=False)
@@ -400,7 +517,17 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> list[MaxObject]:
-        """Place objects at random positions on the patcher canvas."""
+        """Place objects at random positions on the patch canvas.
+
+        Args:
+            objs: Object specifications to place.
+            seed: Seed used to generate deterministic random coordinates.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+
+        Returns:
+            The newly placed objects.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=False)
@@ -414,7 +541,17 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> list[MaxObject]:
-        """Place objects at explicit positions."""
+        """Place objects at explicit coordinates.
+
+        Args:
+            objs: Object specifications to place.
+            positions: One ``[x, y]`` pair per object.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+
+        Returns:
+            The newly placed objects.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=False)
@@ -433,7 +570,17 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> list[MaxObject]:
-        """Place objects vertically."""
+        """Place objects vertically from the current cursor position.
+
+        Args:
+            objs: Object specifications to place.
+            spacing: Vertical distance between successive objects.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+
+        Returns:
+            The newly placed objects.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=False)
@@ -447,7 +594,24 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> MaxObject:
-        """Place one object into the patch."""
+        """Place a single object into the patch.
+
+        Args:
+            obj: Object specification to place.
+            position: Target ``[x, y]`` position. When omitted, ``[0.0, 0.0]``
+                is used.
+            *args: Legacy positional flags mapped to ``verbose`` and
+                ``replace_id``.
+            **options: Keyword options. Supported keys are ``verbose`` and
+                ``replace_id``.
+
+        Returns:
+            The placed object instance.
+
+        Raises:
+            TypeError: If too many legacy flags are supplied or an option has
+                the wrong type.
+        """
         if len(args) > _MAX_LEGACY_FLAGS:
             message = "place_obj accepts at most two legacy positional options"
             raise _type_error(message)
@@ -469,7 +633,14 @@ class MaxPatch:
         )
 
     def get_obj_from_spec(self, obj_spec: _placing.ObjectSpec) -> MaxObject:
-        """Return a `MaxObject` from a placement spec."""
+        """Normalize a placement specification into a ``MaxObject``.
+
+        Args:
+            obj_spec: String, ``MaxObject``, or compatible legacy object spec.
+
+        Returns:
+            A ``MaxObject`` instance ready for placement.
+        """
         return _placing.get_obj_from_spec(self, obj_spec)
 
     def connect(
@@ -477,7 +648,13 @@ class MaxPatch:
         *connections: ConnectionSpec,
         **options: object,
     ) -> None:
-        """Connect outlets to inlets."""
+        """Connect outlets to inlets.
+
+        Args:
+            *connections: Connection triplets or pairs in
+                ``[Outlet, Inlet, midpoints?]`` form.
+            **options: Keyword options. Supported key is ``verbose``.
+        """
         verbose = _bool_option(options, "verbose", default=True)
         _assert_no_options(options)
         _patchcords.connect(self, *connections, verbose=verbose)
@@ -514,7 +691,14 @@ class MaxPatch:
         *args: object,
         **options: object,
     ) -> None:
-        """Delete objects and/or patchcords."""
+        """Delete objects and/or patchcords from the patch.
+
+        Args:
+            objs: Object ids to remove.
+            cords: Patchcord specs to remove.
+            *args: Optional legacy positional ``verbose`` flag.
+            **options: Keyword options. Supported key is ``verbose``.
+        """
         if args:
             options.setdefault("verbose", args[0])
         verbose = _bool_option(options, "verbose", default=True)
@@ -538,7 +722,12 @@ class MaxPatch:
         _deleting.delete_objs(self, *objs, verbose=verbose)
 
     def check(self, *flags: str) -> None:
-        """Run patch-level validation helpers."""
+        """Run patch-level validation helpers.
+
+        Args:
+            *flags: Validation categories such as ``unknown``, ``js``,
+                ``abstractions``, or ``all``.
+        """
         _checking.check(self, *flags)
 
     def get_unknowns(self) -> ObjectDict:

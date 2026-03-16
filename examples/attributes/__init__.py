@@ -1,0 +1,1 @@
+"""Attribute example package."""

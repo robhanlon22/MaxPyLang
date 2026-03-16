@@ -1,4 +1,4 @@
-"""Expose the `MaxObject` facade."""
+"""Public facade for individual Max objects and their metadata."""
 
 from __future__ import annotations
 
@@ -31,7 +31,13 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MaxObject:
-    """Represent a Max object within a patch."""
+    """Represent a Max object within a patch.
+
+    ``MaxObject`` wraps the serialized Max box dictionary together with parsed
+    argument, attribute, inlet, and outlet metadata. Instances can be created
+    from raw object text, declared abstractions, or a saved box dictionary read
+    from an existing patch.
+    """
 
     arg_warning = True
     known_objs = misc.get_objs()
@@ -49,7 +55,20 @@ class MaxObject:
         outlets: int | None = None,
         **extra_attribs: object,
     ) -> None:
-        """Initialize an object from text or a saved box dictionary."""
+        """Initialize an object from text or a saved box dictionary.
+
+        Args:
+            text: Object text such as ``"cycle~ 440"`` or a serialized box
+                dictionary when ``from_dict`` is true.
+            from_dict: Whether ``text`` is actually a serialized Max box
+                dictionary.
+            abstraction: Whether an unresolved object should be treated as an
+                abstraction declaration with explicit I/O counts.
+            inlets: Explicit inlet count for declared abstractions.
+            outlets: Explicit outlet count for declared abstractions.
+            **extra_attribs: Extra box attributes applied when constructing from
+                text.
+        """
         self._ref_file: str | None = None
         self._dict: ObjectDict = {}
         self._name = ""
@@ -119,11 +138,25 @@ class MaxObject:
         text: str | None = None,
         **extra_attribs: object,
     ) -> None:
-        """Edit the object text and extra attributes."""
+        """Edit the object text and/or extra box attributes.
+
+        Args:
+            text_add: Whether new text should be appended to existing args or
+                replace them entirely.
+            text: Replacement or appended object text. When provided without the
+                object name prefix, the current name is preserved automatically.
+            **extra_attribs: Additional Max box attributes to validate and
+                apply.
+        """
         _exposed.edit(self, text_add=text_add, text=text, **extra_attribs)
 
     def link(self, link_file: str | None = None) -> None:
-        """Link a js file or abstraction file to the object."""
+        """Link a ``js`` object or abstraction to an external file.
+
+        Args:
+            link_file: Optional path to the linked file. When omitted, the
+                existing filename stored on the object is used.
+        """
         _exposed.link(self, link_file=link_file)
 
     def inspect(self) -> None:
@@ -139,7 +172,16 @@ class MaxObject:
         inlets: int | None = None,
         outlets: int | None = None,
     ) -> None:
-        """Build the object from in-box text."""
+        """Populate the object from raw Max box text.
+
+        Args:
+            text: Raw in-box Max text.
+            extra_attribs: Extra attributes collected from keyword arguments.
+            abstraction: Whether to treat unknown text as an abstraction
+                declaration.
+            inlets: Explicit inlet count for declared abstractions.
+            outlets: Explicit outlet count for declared abstractions.
+        """
         _instantiation.build_from_specs(
             self,
             text,
@@ -149,11 +191,23 @@ class MaxObject:
         )
 
     def build_from_dict(self, given_dict: object) -> None:
-        """Build the object from a serialized box dictionary."""
+        """Populate the object from a serialized Max box dictionary.
+
+        Args:
+            given_dict: Serialized ``{"box": ...}`` dictionary from a Max
+                patch.
+        """
         _instantiation.build_from_dict(self, given_dict)
 
     def parse_text(self, text: str) -> tuple[str, ObjectArgs, ObjectDict]:
-        """Parse object text into name, args, and attributes."""
+        """Parse object text into a name, typed args, and text attributes.
+
+        Args:
+            text: Raw Max object text.
+
+        Returns:
+            A tuple of ``(name, args, text_attributes)``.
+        """
         return _text.parse_text(self, text)
 
     def update_text(self) -> None:
@@ -173,7 +227,15 @@ class MaxObject:
         return _reffile.check_aliases(self, name)
 
     def get_info(self, ref_file: str | None = None) -> ObjectDict:
-        """Return parsed reference metadata for the object."""
+        """Return reference metadata for the object.
+
+        Args:
+            ref_file: Optional explicit reference file marker to resolve
+                instead of the object's current one.
+
+        Returns:
+            Parsed metadata covering defaults, args, attributes, and I/O.
+        """
         return _reffile.get_info(self, ref_file=ref_file)
 
     def make_xlets_from_self_dict(self) -> None:
@@ -185,7 +247,12 @@ class MaxObject:
         inout_info: dict[str, Any],
         default_info: dict[str, Any],
     ) -> None:
-        """Update inlet and outlet counts from parsed metadata."""
+        """Update inlet and outlet counts from imported metadata.
+
+        Args:
+            inout_info: Imported inlet/outlet metadata.
+            default_info: Default saved-object metadata used as a fallback.
+        """
         _makexlets.update_ins_outs(self, inout_info, default_info)
 
     def parse_io_num(self, info: ObjectInfoList, default_num: int) -> int:
@@ -223,7 +290,16 @@ class MaxObject:
         args: ObjectArgs,
         arg_info: dict[str, Any],
     ) -> bool:
-        """Validate object args against reference metadata."""
+        """Validate object arguments against imported metadata.
+
+        Args:
+            name: Object name used in warning messages.
+            args: Candidate typed argument list.
+            arg_info: Imported required and optional argument metadata.
+
+        Returns:
+            ``True`` when the argument list is acceptable for the object.
+        """
         return _args.args_valid(self, name, args, arg_info)
 
     def get_typed_args(self, args: list[str]) -> ObjectArgs:
@@ -240,7 +316,16 @@ class MaxObject:
         extra_attribs: ObjectDict,
         attrib_info: Sequence[Mapping[str, Any]],
     ) -> tuple[ObjectDict, ObjectDict]:
-        """Split valid text attributes from extra attributes."""
+        """Validate text and extra attributes against reference metadata.
+
+        Args:
+            text_attribs: Attributes expressed inside the object text.
+            extra_attribs: Additional box attributes supplied separately.
+            attrib_info: Imported attribute metadata for the object.
+
+        Returns:
+            A tuple of ``(valid_text_attribs, valid_extra_attribs)``.
+        """
         return _attribs.get_all_valid_attribs(
             self,
             text_attribs,
@@ -265,7 +350,12 @@ class MaxObject:
         return _attribs.get_extra_attribs(self)
 
     def create_js(self, *, from_dict: bool | None = None) -> None:
-        """Initialize js metadata from args or a saved dict."""
+        """Initialize ``js`` metadata from args or a saved dictionary.
+
+        Args:
+            from_dict: Whether to rebuild from saved box metadata instead of
+                parsing the current args.
+        """
         _specialobjs.create_js(self, from_dict=from_dict)
 
     def get_js_filename(self) -> str | None:
@@ -277,7 +367,16 @@ class MaxObject:
         filename: str,
         log_var: str | None = None,
     ) -> tuple[str | int, str | int]:
-        """Read inlet and outlet counts from a js file."""
+        """Read inlet and outlet counts from a ``js`` file.
+
+        Args:
+            filename: Path to the JavaScript file to inspect.
+            log_var: Optional context label included in log messages.
+
+        Returns:
+            A ``(numinlets, numoutlets)`` tuple parsed from the file, or
+            default ``(1, 1)`` values when the declarations are missing.
+        """
         return _specialobjs.get_js_io(self, filename, log_var=log_var)
 
     def update_js_from_file(
@@ -299,7 +398,13 @@ class MaxObject:
         *,
         from_dict: bool = True,
     ) -> None:
-        """Initialize abstraction metadata."""
+        """Initialize abstraction metadata from a file or saved dictionary.
+
+        Args:
+            text: Raw abstraction object text when building from specs.
+            extra_attribs: Extra attributes to preserve on the abstraction box.
+            from_dict: Whether to rebuild from saved box metadata.
+        """
         _specialobjs.create_abstraction(
             self,
             text=text,
@@ -317,7 +422,13 @@ class MaxObject:
         extra_attribs: ObjectDict | None,
         log_var: str | None = None,
     ) -> None:
-        """Refresh abstraction metadata from the linked file."""
+        """Refresh abstraction metadata from the linked patch file.
+
+        Args:
+            text: Object text to store on the rebuilt abstraction box.
+            extra_attribs: Extra attributes to validate and reapply.
+            log_var: Optional label included in log messages.
+        """
         _specialobjs.update_abstraction_from_file(
             self,
             text,
@@ -336,7 +447,14 @@ class MaxObject:
         numoutlets: int,
         extra_attribs: ObjectDict,
     ) -> None:
-        """Create an abstraction with explicit inlet and outlet counts."""
+        """Create an abstraction declaration with explicit I/O counts.
+
+        Args:
+            text: Raw abstraction object text.
+            numinlets: Declared inlet count.
+            numoutlets: Declared outlet count.
+            extra_attribs: Extra validated box attributes.
+        """
         _specialobjs.create_declared_abstraction(
             self,
             text,
@@ -366,7 +484,11 @@ class MaxObject:
         return _obj_misc.repr_object(self)
 
     def debug(self) -> None:
-        """Log the internal object state at debug level."""
+        """Log the internal object state at debug level.
+
+        This is primarily intended for debugging tests and metadata import
+        issues when the serialized Max box state needs to be inspected.
+        """
         _LOGGER.debug("ref_file %s", self._ref_file)
         _LOGGER.debug("dict %s", self._dict)
         _LOGGER.debug("name %s", self._name)

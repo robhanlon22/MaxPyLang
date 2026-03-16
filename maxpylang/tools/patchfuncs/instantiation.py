@@ -1,4 +1,4 @@
-"""Helpers for constructing `MaxPatch` instances."""
+"""Helpers for constructing and loading ``MaxPatch`` instances."""
 
 from __future__ import annotations
 
@@ -27,7 +27,16 @@ def load_template(
     *,
     verbose: bool = True,
 ) -> None:
-    """Load a patch template into the patch instance."""
+    """Load a patch template into the patch instance.
+
+    Args:
+        self: Patch being initialized.
+        template: Template filename or path.
+        verbose: Legacy compatibility flag retained for the public API.
+
+    Raises:
+        AssertionError: If the requested template does not exist.
+    """
     del verbose
     template_path = Path(template)
     if not template_path.exists():
@@ -50,7 +59,14 @@ def load_file(
     reorder: bool = True,
     verbose: bool = True,
 ) -> None:
-    """Load an existing `.maxpat` file into the patch instance."""
+    """Load an existing ``.maxpat`` file into the patch instance.
+
+    Args:
+        self: Patch being initialized.
+        filename: Existing patch path.
+        reorder: Whether to renumber loaded objects after reading them.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     input_path = Path(filename)
     _LOGGER.debug("Patcher: loading patch from existing file: %s", input_path.name)
 
@@ -70,7 +86,13 @@ def load_objs_from_dict(
     *,
     verbose: bool = True,
 ) -> None:
-    """Load box objects from a serialized patch dictionary."""
+    """Load box objects from a serialized patch dictionary.
+
+    Args:
+        self: Patch being populated.
+        patch_dict: Serialized patcher dictionary.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     del verbose
     self._num_objs = 0
     patcher = cast("dict[str, Any]", patch_dict["patcher"])
@@ -87,7 +109,13 @@ def load_patchcords_from_dict(
     *,
     verbose: bool = True,
 ) -> None:
-    """Load patchcords from a serialized patch dictionary."""
+    """Load patchcords from a serialized patch dictionary.
+
+    Args:
+        self: Patch being populated.
+        patch_dict: Serialized patcher dictionary.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     patcher = cast("dict[str, Any]", patch_dict["patcher"])
     for line in cast("list[Any]", patcher["lines"]):
         line_dict = cast("dict[str, Any]", line)
@@ -107,7 +135,15 @@ def load_patchcords_from_dict(
 
 
 def clean_patcher_dict(self: MaxPatch, patch_dict: JSONDict) -> JSONDict:
-    """Strip box and patchcord data from a patch dictionary."""
+    """Strip box and patchcord data from a patch dictionary.
+
+    Args:
+        self: Unused patch reference kept for API symmetry.
+        patch_dict: Serialized patcher dictionary.
+
+    Returns:
+        A copy-ready patch dictionary with ``boxes`` and ``lines`` cleared.
+    """
     del self
     patcher = cast("dict[str, Any]", patch_dict["patcher"])
     patcher["boxes"] = []

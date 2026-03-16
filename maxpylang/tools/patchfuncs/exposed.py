@@ -1,4 +1,4 @@
-"""User-facing helpers exposed through `MaxPatch`."""
+"""User-facing patch helpers exposed through ``MaxPatch``."""
 
 from __future__ import annotations
 
@@ -13,7 +13,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def reorder(self: MaxPatch, *, verbose: bool = False) -> None:
-    """Renumber patch objects sequentially."""
+    """Renumber patch objects sequentially.
+
+    Args:
+        self: Patch to reorder.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     del verbose
     _LOGGER.debug("reordering %s objects...", self.num_objs)
 
@@ -36,7 +41,16 @@ def set_position(
     from_place: bool = False,
     verbose: bool = False,
 ) -> None:
-    """Set the patch placement cursor."""
+    """Set the patch placement cursor.
+
+    Args:
+        self: Patch whose placement cursor should move.
+        new_x: New X coordinate.
+        new_y: New Y coordinate.
+        from_place: Whether the call originated from higher-level placement
+            helpers, which changes the error wording.
+        verbose: Legacy compatibility flag retained for the public API.
+    """
     del verbose
     if isinstance(new_x, (float, int)) and isinstance(new_y, (float, int)):
         self._curr_position = [new_x, new_y]
@@ -65,7 +79,16 @@ def replace(
     verbose: bool = False,
     **new_attribs: object,
 ) -> None:
-    """Replace one object with another and preserve compatible state."""
+    """Replace one object with another and preserve compatible state.
+
+    Args:
+        self: Patch containing the object being replaced.
+        curr_obj_num: Existing object id.
+        new_obj: Replacement object spec.
+        retain: Whether compatible extra attributes should be preserved.
+        verbose: Legacy compatibility flag retained for the public API.
+        **new_attribs: Extra attributes to apply to the replacement object.
+    """
     if curr_obj_num not in self._objs:
         _LOGGER.warning("%s does not exist, nothing changed", curr_obj_num)
         return

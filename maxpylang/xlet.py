@@ -1,4 +1,4 @@
-"""Classes for inlets and outlets attached to Max objects."""
+"""Inlet and outlet classes used to model patchcord endpoints."""
 
 from __future__ import annotations
 
@@ -33,7 +33,11 @@ def _parent_name(parent: object) -> str:
 
 
 class Inlet:
-    """Represent an inlet and the patchcords routed into it."""
+    """Represent an inlet and the patchcords routed into it.
+
+    An inlet keeps track of connected source outlets, any stored midpoint data,
+    and the inlet's accepted type metadata.
+    """
 
     def __init__(
         self,
@@ -43,7 +47,15 @@ class Inlet:
         midpoints: list[Midpoint] | None = None,
         types: XletTypes = None,
     ) -> None:
-        """Initialize an inlet for the given parent object."""
+        """Initialize an inlet for the given parent object.
+
+        Args:
+            parent: Object that owns the inlet.
+            index: Zero-based inlet index on the parent object.
+            sources: Existing connected source outlets.
+            midpoints: Stored midpoint metadata aligned with ``sources``.
+            types: Accepted inlet connection types.
+        """
         self._parent = parent  # parent MaxObject
         self._sources = sources or []  # list of Outlets
         self._midpoints = (
@@ -101,19 +113,38 @@ class Inlet:
         return rep
 
     def add_source(self, source: Outlet, midpoints: Midpoint) -> None:
-        """Attach a source outlet and its midpoint data."""
+        """Attach a source outlet and its midpoint data.
+
+        Args:
+            source: Outlet connected to this inlet.
+            midpoints: Midpoint metadata associated with the connection.
+        """
         self._sources.append(source)
         self._midpoints.append(midpoints)
 
     def remove_source(self, source: Outlet) -> Midpoint:
-        """Detach a source outlet and return its stored midpoint entry."""
+        """Detach a source outlet and return its stored midpoint entry.
+
+        Args:
+            source: Outlet to disconnect from this inlet.
+
+        Returns:
+            The midpoint metadata previously associated with ``source``.
+        """
         source_index = self._sources.index(source)
         midpoint = self._midpoints.pop(source_index)
         del self._sources[source_index]
         return midpoint
 
     def midpoint_for(self, source: Outlet) -> Midpoint:
-        """Return the midpoint entry for a source outlet."""
+        """Return the midpoint entry stored for a source outlet.
+
+        Args:
+            source: Connected source outlet.
+
+        Returns:
+            The midpoint metadata associated with ``source``.
+        """
         return self._midpoints[self._sources.index(source)]
 
     def set_types(self, types: XletTypes) -> None:
@@ -122,7 +153,11 @@ class Inlet:
 
 
 class Outlet:
-    """Represent an outlet and the patchcords routed out of it."""
+    """Represent an outlet and the patchcords routed out of it.
+
+    An outlet keeps track of connected destination inlets together with the
+    type metadata emitted by that outlet.
+    """
 
     def __init__(
         self,
@@ -131,7 +166,14 @@ class Outlet:
         destinations: list[Inlet] | None = None,
         types: XletTypes = None,
     ) -> None:
-        """Initialize an outlet for the given parent object."""
+        """Initialize an outlet for the given parent object.
+
+        Args:
+            parent: Object that owns the outlet.
+            index: Zero-based outlet index on the parent object.
+            destinations: Existing connected destination inlets.
+            types: Output types emitted by the outlet.
+        """
         self._parent = parent  # parent MaxObject
         self._destinations = destinations or []  # list of Inlets
         self._types: XletTypes = [] if types is None else types  # output types
@@ -184,11 +226,19 @@ class Outlet:
         return rep
 
     def add_destination(self, destination: Inlet) -> None:
-        """Attach a destination inlet."""
+        """Attach a destination inlet.
+
+        Args:
+            destination: Inlet connected to this outlet.
+        """
         self._destinations.append(destination)
 
     def remove_destination(self, destination: Inlet) -> None:
-        """Detach a destination inlet."""
+        """Detach a destination inlet.
+
+        Args:
+            destination: Inlet to disconnect from this outlet.
+        """
         self._destinations.remove(destination)
 
     def set_types(self, types: XletTypes) -> None:
