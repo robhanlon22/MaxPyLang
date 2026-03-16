@@ -13,6 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
+    "Typing :: Typed",
 ]
 license = "MIT"
 license-files = ["LICENSE.txt"]
@@ -71,7 +72,7 @@ exclude = ["maxpylang.test*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-maxpylang = ["data/*.json", "data/*/*.json", "data/*/*/*.json"]
+maxpylang = ["py.typed", "data/*.json", "data/*/*.json", "data/*/*/*.json"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["__pycache__/*", "*.py[cod]"]
